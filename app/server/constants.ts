@@ -78,7 +78,6 @@ function createCorsMiddleware() {
     }
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Content-Disposition, X-Overdrive-Key')
-    res.header('Access-Control-Allow-Credentials', 'true')
     res.header('Access-Control-Expose-Headers', 'Content-Disposition')
 
     if (req.method === 'OPTIONS') {
