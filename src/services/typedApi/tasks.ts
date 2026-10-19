@@ -360,7 +360,7 @@ export const tasksApi = {
   },
 
   createBackup() {
-    return apiClient.get(API_ROUTES.tasksBackupsCreateBackup)
+    return apiClient.post(API_ROUTES.tasksBackupsCreateBackup, {})
   },
 
   deleteBackup(body: BackupNamePayload) {

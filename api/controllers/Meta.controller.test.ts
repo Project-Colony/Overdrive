@@ -75,6 +75,10 @@ function createResponse() {
       res.body = payload
       return res
     },
+    json(payload: unknown) {
+      res.body = payload
+      return res
+    },
     sendStatus(code: number) {
       res.statusCode = code
       return res
@@ -175,6 +179,17 @@ describe('Meta.controller', () => {
       force: true,
     })
     expect(res.statusCode).toBe(200)
+  })
+
+  it('rejects a non-numeric id without deleting anything', () => {
+    const req = {params: {id: '..'}} as unknown as ApiRequest
+    const res = createResponse()
+
+    controller.deleteOne(req, res)
+
+    expect(res.statusCode).toBe(400)
+    expect(deleteById).not.toHaveBeenCalled()
+    expect(rmSync).not.toHaveBeenCalled()
   })
 
   it('returns 500 when create fails', () => {

@@ -1,4 +1,6 @@
 import { promises as fsPromises } from 'fs'
+import os from 'os'
+import path from 'path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const findById = vi.fn()
@@ -16,6 +18,7 @@ vi.mock('../server/resolvePathCache', () => ({
 import {
   checkBatchDiskSpace,
   estimateSeconds,
+  moveFile,
   prepareMoveItems,
   prepareRename,
 } from './moveFile'
@@ -102,5 +105,29 @@ describe('prepareRename', () => {
       code: 'NOT_FOUND',
       message: 'Source file not found',
     })
+  })
+})
+
+describe('moveFile cross-device copy', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it.skipIf(process.platform === 'win32')('keeps the source file mode', async () => {
+    const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'movefile-'))
+    try {
+      const source = path.join(dir, 'private.mp4')
+      const destination = path.join(dir, 'out', 'private.mp4')
+      await fsPromises.writeFile(source, 'data', {mode: 0o600})
+      vi.spyOn(fsPromises, 'rename').mockRejectedValueOnce(Object.assign(new Error('cross-device'), {code: 'EXDEV'}))
+
+      const result = await moveFile(source, destination)
+
+      expect(result.crossDevice).toBe(true)
+      expect((await fsPromises.stat(destination)).mode & 0o777).toBe(0o600)
+      await expect(fsPromises.stat(source)).rejects.toThrow()
+    } finally {
+      await fsPromises.rm(dir, {recursive: true, force: true})
+    }
   })
 })

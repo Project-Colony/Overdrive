@@ -89,6 +89,10 @@ function createResponse() {
       this.body = payload
       return this
     },
+    json(payload: unknown) {
+      this.body = payload
+      return this
+    },
     sendStatus(code: number) {
       this.statusCode = code
       return this

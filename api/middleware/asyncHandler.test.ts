@@ -15,6 +15,10 @@ function createResponse() {
       this.body = payload
       return this
     },
+    json(payload: unknown) {
+      this.body = payload
+      return this
+    },
   }
   return res
 }

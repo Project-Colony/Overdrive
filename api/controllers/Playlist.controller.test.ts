@@ -57,6 +57,10 @@ function createResponse() {
       res.body = payload
       return res
     },
+    json(payload: unknown) {
+      res.body = payload
+      return res
+    },
     sendStatus(code: number) {
       res.statusCode = code
       return res

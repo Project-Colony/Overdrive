@@ -20,15 +20,21 @@ import { formatMarkTimestamp } from '../../../shared/markTimestamp'
 import { generateVideoGrid } from '../../services/videoGrid'
 import { resolveMediaIdFromGridRequest } from '../../services/videoGridRequest'
 import { isUsableVideoThumbFile } from '../../services/videoPreviewThumb'
+import { isPathInside } from '../../utils/isPathInside'
+import { buildPathLookupVariants } from '../../utils/normalizeUserPath'
 
 export default function createTasksVideoPreviewController(shared: TaskControllerShared) {
-  const {db, dbPath, createThumbMiddle, createThumbCustom, getImageMedia} = shared
+  // Read dbPath per request: a destructured snapshot goes stale after a database switch.
+  const {db, getDbPath, createThumbMiddle, createThumbCustom, getImageMedia} = shared
   const marksRepo = createMarksRepository(db.drizzle)
   const mediaRepo = createMediaRepository(db.drizzle)
 
   const createThumbForVideo = async function (req: ApiRequest, res: ApiResponse) {
     const seekRatio = req.body.seekRatio != null ? Number(req.body.seekRatio) : 0.5
-    const resolvedInputPath = resolveActiveDbFilePath(req.body.path, dbPath)
+    // Source comes from the library row, never from a client-supplied path.
+    const mediaId = Number(req.body.id)
+    const media = mediaId ? mediaRepo.findById(mediaId) : undefined
+    const resolvedInputPath = resolveActiveDbFilePath(media?.path, getDbPath())
     if (!resolvedInputPath) {
       sendBadRequest(res, 'The video does not exist.')
       return
@@ -45,7 +51,14 @@ export default function createTasksVideoPreviewController(shared: TaskController
 
   const createThumb = async function (req: ApiRequest, res: ApiResponse) {
     try {
-      const resolvedInputPath = resolveActiveDbFilePath(req.body.inputPath, dbPath)
+      const dbPath = getDbPath()
+      const media = mediaRepo.findByPathVariants(buildPathLookupVariants(String(req.body.inputPath || '')))
+      if (!media) {
+        sendBadRequest(res, 'The video is not in the library.')
+        return
+      }
+
+      const resolvedInputPath = resolveActiveDbFilePath(media.path, dbPath)
       if (!resolvedInputPath) {
         sendBadRequest(res, 'The video does not exist.')
         return
@@ -54,6 +67,11 @@ export default function createTasksVideoPreviewController(shared: TaskController
       const outputPath = path.normalize(String(req.body.outputPath || ''))
       if (!outputPath) {
         sendBadRequest(res, 'No output path provided.')
+        return
+      }
+      // createThumbCustom runs mkdir -p and replaces the target, so confine it first.
+      if (!dbPath || !isPathInside(path.join(dbPath, 'media'), outputPath)) {
+        sendBadRequest(res, 'Output path must be inside the database media folder.')
         return
       }
 
@@ -79,15 +97,25 @@ export default function createTasksVideoPreviewController(shared: TaskController
   }
 
   const createGrid = async function (req: ApiRequest, res: ApiResponse) {
+    const dbPath = getDbPath()
     const gridsPath = path.join(dbPath ?? '', 'media', 'videos', 'grids')
 
-    if (!fs.existsSync(req.body.input)) {
+    // The UI sends `${id}.jpg`; anything with a directory part would escape gridsPath.
+    const output = String(req.body.output ?? '')
+    if (path.basename(output) !== output || output === '..') {
+      sendBadRequest(res, 'Invalid grid output name.')
+      return
+    }
+
+    const mediaId = resolveMediaIdFromGridRequest(req.body)
+    // Source comes from the library row; req.body.input is ignored.
+    const input = mediaId ? resolveActiveDbFilePath(mediaRepo.findById(mediaId)?.path, dbPath) : null
+    if (!input) {
       sendBadRequest(res, 'The video does not exist.')
       return
     }
 
-    const gridPath = path.join(gridsPath, req.body.output);
-    const mediaId = resolveMediaIdFromGridRequest(req.body)
+    const gridPath = path.join(gridsPath, output)
 
     const ensureVisualHash = async (force = false) => {
       if (!mediaId) return
@@ -113,7 +141,7 @@ export default function createTasksVideoPreviewController(shared: TaskController
 
     if (!fs.existsSync(gridPath)) {
       try {
-        const result = await generateVideoGrid(req.body, dbPath ?? '')
+        const result = await generateVideoGrid({...req.body, input, output}, dbPath ?? '')
         if (result) {
           // Respond as soon as the sprite is on disk. Visual hash / CLIP can take
           // much longer (and block the ffmpeg queue for the next Review item).
@@ -156,13 +184,25 @@ export default function createTasksVideoPreviewController(shared: TaskController
     try {
       const {url, sizes, image} = req.body
       const outputPath = path.normalize(String(req.body.outputPath || ''))
+      // Tag/performer images live under meta/, media thumbs under media/. Never anywhere
+      // else in the DB folder: db.sqlite or backups/ would be overwritten with a JPEG.
+      const dbPath = getDbPath()
+      if (
+        !dbPath
+        || !/\.(jpe?g|png|webp)$/i.test(outputPath)
+        || !['media', 'meta'].some((folder) => isPathInside(path.join(dbPath, folder), outputPath))
+      ) {
+        sendBadRequest(res, 'Output path must be an image inside the media or meta folder.')
+        return
+      }
       const downloadUrl = url
         || (typeof image === 'string' && /^https?:\/\//i.test(image.trim()) ? image.trim() : null)
       let buf: Buffer
 
       if (downloadUrl) {
         buf = await downloadRemoteImage(downloadUrl)
-      } else if (typeof image === 'string' && path.isAbsolute(image) && fs.existsSync(image)) {
+      } else if (typeof image === 'string' && path.isAbsolute(image) && isPathInside(dbPath, image) && fs.existsSync(image)) {
+        // Local sources are DB files only (face crops); anything else on disk stays unread.
         buf = await fs.promises.readFile(image)
       } else if (typeof image === 'string') {
         const bundled = resolveBundledPublicFile(image)
@@ -182,10 +222,9 @@ export default function createTasksVideoPreviewController(shared: TaskController
       })
       sendCreated(res, {outputPath: result})
     } catch (e) {
-      console.log(e)
-      const message = e instanceof Error
-        ? e.message
-        : 'Failed to download or save image'
+      // Log the detail server-side only: echoing it back would be a port-scan oracle.
+      console.log(e instanceof Error ? e.message : e)
+      const message = 'Failed to download or save image'
       // Soft failure: UI treats 202 as non-fatal image save issues.
       sendControllerError(res, new HttpError(202, message), message)
     }
@@ -215,6 +254,7 @@ export default function createTasksVideoPreviewController(shared: TaskController
         return
       }
 
+      const dbPath = getDbPath()
       const resolvedInputPath = resolveActiveDbFilePath(media.path, dbPath)
       if (!resolvedInputPath) {
         sendBadRequest(res, 'The video does not exist.')

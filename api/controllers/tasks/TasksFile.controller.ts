@@ -1,11 +1,8 @@
 import type { TaskControllerShared } from '../../types/tasks'
 import {
-  HttpError,
   apiErrorMessage,
-  asApiError,
   sendAsClientError,
   sendBadRequest,
-  sendControllerError,
   sendNotFound,
   sendOk,
 } from '../../types/errors'
@@ -18,12 +15,8 @@ import {
 } from '../../services/openPathInFileManager'
 import { checkFilesExist } from '../../services/checkFilesExist'
 import { normalizeMediaPath } from '../../utils/normalizeUserPath'
+import { buildExtensionRegexFromParts } from '../../utils/mediaExtensions'
 import { unlinkResolvedPath } from '../../services/localAssetCleanup'
-import {
-  moveFile,
-  prepareRename,
-  checkRenameDiskSpace,
-} from '../../../app/tasks/moveFile'
 import { createMarksRepository } from '../../db/repositories/marks'
 import { marksToChapters, resolveMarkChaptersForPath } from '../../services/markChaptersForPath'
 import {
@@ -55,62 +48,6 @@ export default function createTasksFileController(shared: TaskControllerShared) 
     const paths = Array.isArray(req.body.paths) ? req.body.paths : []
     const results = await checkFilesExist(paths)
     sendOk(res, { results })
-  }
-
-  const renameFile = async function (req: ApiRequest, res: ApiResponse) {
-    const { old_path, new_path } = req.body
-
-    if (isVirtualZipPath(String(old_path || '')) || isVirtualZipPath(String(new_path || ''))) {
-      return sendBadRequest(res, 'Files inside ZIP archives are read-only', {
-        code: 'ZIP_READONLY',
-        fileName: path.basename(String(old_path || new_path || '')),
-        folder: path.dirname(String(old_path || new_path || '')),
-      })
-    }
-
-    try {
-      const prepared = await prepareRename(old_path, new_path)
-
-      if (prepared.error) {
-        return sendBadRequest(res, String(prepared.error.code || 'Rename failed'), {
-          code: prepared.error.code,
-          fileName: prepared.fileName,
-          folder: prepared.folder,
-        })
-      }
-
-      if (prepared.skip) {
-        return sendOk(res)
-      }
-
-      const diskSpaceError = await checkRenameDiskSpace(prepared)
-      if (diskSpaceError) {
-        return sendBadRequest(res, 'NO_SPACE', {
-          code: 'NO_SPACE',
-          required: diskSpaceError.required,
-          available: diskSpaceError.available,
-          fileName: prepared.fileName,
-          folder: prepared.folder,
-        })
-      }
-
-      await moveFile(old_path, new_path)
-      sendOk(res)
-    } catch (error: unknown) {
-      const apiErr = asApiError(error)
-      console.log('ERROR: ' + apiErr.message)
-      sendControllerError(
-        res,
-        new HttpError(400, apiErr.message || 'Failed to rename file', {
-          code: apiErr.code || 'UNKNOWN',
-          required: apiErr.required,
-          available: apiErr.available,
-          fileName: path.basename(new_path),
-          folder: path.dirname(new_path),
-        }),
-        'Failed to rename file',
-      )
-    }
   }
 
   const openPath = async function (req: ApiRequest, res: ApiResponse) {
@@ -194,13 +131,13 @@ export default function createTasksFileController(shared: TaskControllerShared) 
 
   const getFileList = async function (req: ApiRequest, res: ApiResponse) {
     const entryPath = normalizeMediaPath(req.body.path)
-    const regexObj = JSON.parse(req.body.filter)
     const excluded = Array.isArray(req.body.excluded) ? req.body.excluded : []
-    const regex = new RegExp(regexObj)
     const expandZips = Boolean(req.body.expandZips)
     const extensions = Array.isArray(req.body.extensions)
       ? req.body.extensions.map((ext: unknown) => String(ext || '').trim().toLowerCase().replace(/^\./, '')).filter(Boolean)
       : []
+    // Built here from escaped extensions; the client `filter` regex is ignored.
+    const regex = extensions.length ? buildExtensionRegexFromParts(extensions) : /$^/
 
     try {
       const { files, skippedZips } = await collectFilesWithZipGalleries({
@@ -244,7 +181,6 @@ export default function createTasksFileController(shared: TaskControllerShared) 
   return {
     checkFileExists,
     checkFilesExists,
-    renameFile,
     openPath,
     openInExternalPlayer,
     getFileList,

@@ -282,11 +282,6 @@ export const AuthLoginRequestSchema = z.object({
   password: z.string().optional(),
 })
 
-export const RenameFileRequestSchema = z.object({
-  old_path: z.string().min(1),
-  new_path: z.string().min(1),
-})
-
 export const OpenPathRequestSchema = z.object({
   path: z.string().min(1),
   isDir: z.boolean().optional(),
@@ -300,7 +295,8 @@ export const OpenInExternalPlayerRequestSchema = z.object({
 
 export const GetFileListRequestSchema = z.object({
   path: z.string().min(1),
-  filter: z.string().min(1),
+  // Ignored by the server, which builds the regex from `extensions`.
+  filter: z.string().optional(),
   excluded: z.array(z.string()).optional(),
   expandZips: z.boolean().optional(),
   extensions: z.array(z.string()).optional(),

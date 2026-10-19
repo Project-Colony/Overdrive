@@ -47,13 +47,13 @@ export function httpStatusFromError(err: unknown, fallback = 500): number {
 /** Successful read / update / action response. */
 export function sendOk(res: Response, body?: unknown): Response {
   if (body === undefined) return res.sendStatus(200)
-  return res.status(200).send(body)
+  return res.status(200).json(body)
 }
 
 /** Successful create response (new resource). */
 export function sendCreated(res: Response, body?: unknown): Response {
   if (body === undefined) return res.sendStatus(201)
-  return res.status(201).send(body)
+  return res.status(201).json(body)
 }
 
 export function sendControllerError(
@@ -64,7 +64,7 @@ export function sendControllerError(
   const message = apiErrorMessage(err) || fallbackMessage
 
   if (err instanceof HttpError) {
-    return res.status(err.status).send({
+    return res.status(err.status).json({
       message: err.message || fallbackMessage,
       ...err.body,
     })
@@ -78,10 +78,10 @@ export function sendControllerError(
         extra[key] = value
       }
     }
-    return res.status(status).send({message, ...extra})
+    return res.status(status).json({message, ...extra})
   }
 
-  return res.status(500).send({message})
+  return res.status(500).json({message})
 }
 
 /** Validation / client-input rejection. */

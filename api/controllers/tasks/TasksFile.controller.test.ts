@@ -26,12 +26,6 @@ vi.mock('../../services/localAssetCleanup', () => ({
   unlinkResolvedPath: vi.fn(),
 }))
 
-vi.mock('../../../app/tasks/moveFile', () => ({
-  moveFile: vi.fn(),
-  prepareRename: vi.fn(),
-  checkRenameDiskSpace: vi.fn(),
-}))
-
 vi.mock('../../db/repositories/marks', () => ({
   createMarksRepository: () => ({findAllForVideo: vi.fn(() => [])}),
 }))
@@ -103,5 +97,32 @@ describe('TasksFileController getFileList errors', () => {
 
     expect(res.statusCode).toBe(400)
     expect(res.body).toEqual({message: 'not directory'})
+  })
+})
+
+describe('TasksFileController getFileList regex', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    collectFilesWithZipGalleries.mockResolvedValue({files: [], skippedZips: []})
+  })
+
+  const regexFor = async (body: Record<string, unknown>) => {
+    const controller = createTasksFileController({db: {drizzle: {}}} as never)
+    await controller.getFileList({body: {path: '/tmp', ...body}} as ApiRequest, createResponse())
+    return collectFilesWithZipGalleries.mock.calls[0][0].regex as RegExp
+  }
+
+  it('builds the regex from extensions and ignores the client filter', async () => {
+    const regex = await regexFor({filter: JSON.stringify('(a+)+$'), extensions: ['mp4']})
+
+    expect(regex.test('/videos/clip.mp4')).toBe(true)
+    expect(regex.test('/videos/clip.mkv')).toBe(false)
+    expect(regex.test('/videos/clipxmp4')).toBe(false)
+  })
+
+  it('matches nothing without extensions', async () => {
+    const regex = await regexFor({filter: JSON.stringify('.*')})
+
+    expect(regex.test('/videos/clip.mp4')).toBe(false)
   })
 })

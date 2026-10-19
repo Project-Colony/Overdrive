@@ -59,11 +59,13 @@ async function copyFileWithProgress(
   destinationPath: string,
   onProgress?: MoveProgressHandler,
 ): Promise<void> {
-  const { size } = await fs.stat(sourcePath)
+  const { size, mode } = await fs.stat(sourcePath)
   let transferred = 0
 
   const readStream = fssync.createReadStream(sourcePath)
-  const writeStream = fssync.createWriteStream(destinationPath)
+  // 'wx' refuses a destination created since the existence check (or a planted
+  // symlink); the source mode keeps private files private.
+  const writeStream = fssync.createWriteStream(destinationPath, { flags: 'wx', mode: mode & 0o777 })
 
   readStream.on('data', (chunk: Buffer) => {
     transferred += chunk.length

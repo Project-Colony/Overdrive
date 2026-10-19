@@ -10,7 +10,6 @@ import {
   AddMediaBulkRequestSchema,
   ParsePathTagsRequestSchema,
   ApplyParseLibraryTagsRequestSchema,
-  RenameFileRequestSchema,
   OpenPathRequestSchema,
   OpenInExternalPlayerRequestSchema,
   GetFileListRequestSchema,
@@ -151,7 +150,6 @@ export default function registerRoutes(app: Express, db: ApiDb) {
 
   register('post', '/checkFileExists', 'checkFileExists', validateBody(PathPayloadSchema))
   register('post', '/checkFilesExists', 'checkFilesExists', validateBody(CheckFilesPayloadSchema))
-  register('post', '/renameFile', 'renameFile', validateBody(RenameFileRequestSchema))
   register('post', '/openPath', 'openPath', validateBody(OpenPathRequestSchema))
   register('post', '/openInExternalPlayer', 'openInExternalPlayer', validateBody(OpenInExternalPlayerRequestSchema))
   register('post', '/getFileList', 'getFileList', validateBody(GetFileListRequestSchema))

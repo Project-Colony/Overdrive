@@ -137,7 +137,7 @@ export default function createTasksMediaController(shared: TaskControllerShared)
         mediaType: mediaType.type != null ? String(mediaType.type) : undefined,
       })
     } catch (error: unknown) {
-      console.error(`Fingerprint failed for ${pathToFile}:`, apiErrorMessage(error))
+      console.error('Fingerprint failed for %s:', pathToFile, apiErrorMessage(error))
       return null
     }
 
@@ -282,7 +282,7 @@ export default function createTasksMediaController(shared: TaskControllerShared)
             mediaRepo.updateById(Number(media.id), fingerprint.patch)
           }
         } catch (error: unknown) {
-          console.error(`Fingerprint failed for ${pathToFile}:`, apiErrorMessage(error))
+          console.error('Fingerprint failed for %s:', pathToFile, apiErrorMessage(error))
         }
       }
 

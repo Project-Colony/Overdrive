@@ -18,7 +18,7 @@ function createResponse() {
       this.statusCode = code
       return this
     },
-    send(payload: unknown) {
+    json(payload: unknown) {
       this.body = payload
       return this
     },

@@ -18,6 +18,10 @@ function mockRes() {
       this.body = body
       return this
     },
+    json(body: unknown) {
+      this.body = body
+      return this
+    },
     sendStatus(code: number) {
       this.statusCode = code
       return this

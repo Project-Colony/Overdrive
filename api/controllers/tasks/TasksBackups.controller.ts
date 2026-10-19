@@ -1,5 +1,5 @@
 import type { Express } from 'express'
-import { HttpError, sendAsClientError, sendControllerError, sendOk } from '../../types/errors'
+import { HttpError, sendAsClientError, sendBadRequest, sendControllerError, sendOk } from '../../types/errors'
 import type { ApiRequest, ApiResponse } from '../../types/http'
 import type { BackupEntry } from '@shared/api/responses'
 import type { ApiDb } from '../../types/db'
@@ -26,6 +26,8 @@ export default function (app: Express, db: ApiDb) {
     return db.path
   }
   const getBackupsPath = () => path.join(getDbPath(), 'backups')
+  // Backup names are bare file names from getBackups; a separator would leave the backups folder.
+  const isBackupName = (name: string) => name === path.basename(name)
 
   const createBackup = function (req: ApiRequest, res: ApiResponse) {
     const currentdate = new Date(),
@@ -85,6 +87,7 @@ export default function (app: Express, db: ApiDb) {
   };
 
   const deleteBackup = function (req: ApiRequest, res: ApiResponse) {
+    if (!isBackupName(String(req.body.name))) return sendBadRequest(res, 'Invalid backup name')
     const backupPath = path.join(getBackupsPath(), String(req.body.name) + '.zip')
     fs.unlink(backupPath, (err: unknown) => {
       if (err) {
@@ -94,6 +97,7 @@ export default function (app: Express, db: ApiDb) {
   }
 
   const restoreBackup = async (req: ApiRequest, res: ApiResponse) => {
+    if (!isBackupName(String(req.body.name))) return sendBadRequest(res, 'Invalid backup name')
     const dbPath = getDbPath()
     const backupPath = path.join(getBackupsPath(), String(req.body.name) + '.zip')
     const dbFile = path.join(dbPath, 'db.sqlite')
@@ -181,6 +185,7 @@ export default function (app: Express, db: ApiDb) {
   const exportBackup = async (req: ApiRequest, res: ApiResponse) => {
     try {
       const archiveName = String(req.body.archive ?? '')
+      if (!isBackupName(archiveName)) return sendBadRequest(res, 'Invalid backup name')
       const destDir = String(req.body.path ?? '')
       const fromPath = path.join(getBackupsPath(), archiveName + '.zip')
       const toPath = path.join(destDir, archiveName + '.zip')

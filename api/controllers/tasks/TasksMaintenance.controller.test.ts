@@ -73,6 +73,10 @@ function createResponse() {
       res.body = payload
       return res
     },
+    json(payload: unknown) {
+      res.body = payload
+      return res
+    },
   }
 
   return res as ApiResponse & {statusCode: number; body: unknown}

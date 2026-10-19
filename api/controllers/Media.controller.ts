@@ -91,7 +91,7 @@ export default function (db: ApiDb) {
             console.log(`${purgePath} is unavailable.`)
           }
         } catch (error) {
-          console.error(`Failed to delete media file ${purgePath}:`, apiErrorMessage(error))
+          console.error('Failed to delete media file %s:', purgePath, apiErrorMessage(error))
         }
       }
 
@@ -426,7 +426,7 @@ export default function (db: ApiDb) {
             console.log(`ZIP archive unavailable for delete: ${zipArchivePath}`)
           }
         } catch (error) {
-          console.error(`Failed to delete ZIP archive ${zipArchivePath}:`, apiErrorMessage(error))
+          console.error('Failed to delete ZIP archive %s:', zipArchivePath, apiErrorMessage(error))
         }
       }
 

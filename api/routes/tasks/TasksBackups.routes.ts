@@ -13,7 +13,7 @@ export default function registerRoutes(app: Express, db: ApiDb) {
   const TasksBackups = createTasksBackupsController(app, db)
   const router = express.Router()
 
-  router.get('/createBackup', TasksBackups.createBackup)
+  router.post('/createBackup', TasksBackups.createBackup)
   router.get('/getBackups', TasksBackups.getBackups)
   router.post('/deleteBackup', validateBody(BackupNameRequiredRequestSchema), TasksBackups.deleteBackup)
   router.post('/restoreBackup', validateBody(BackupNameRequiredRequestSchema), TasksBackups.restoreBackup)
