@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.3] - 2026-10-19
+
+### Security
+
+- The local API only answers the Overdrive window: Electron passes it a
+  secret on every request. Other programs and web pages (including through
+  DNS rebinding) can no longer read, write or delete your files through it.
+- The password check also covers upper-case URLs and the WebSocket routes,
+  and a group of built-in routes that used to skip it.
+- LAN access needs a password, and login slows down after repeated failures.
+- File names, tags and text from your library are escaped before they are
+  shown, so a crafted name cannot run script in the app.
+- Thumbnail and image writers stay inside the library folder, deleting a
+  field cannot reach outside it, and image downloads refuse local and private
+  network addresses.
+- API keys are hidden from unauthenticated requests.
+
+### Changed
+
+- The browser UI needs a password while the desktop app runs; without one,
+  it says so instead of loading.
+
 ## [1.12.2] - 2026-10-19
 
 First Overdrive release: MediaChips 1.12.0 with the changes below.
