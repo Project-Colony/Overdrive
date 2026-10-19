@@ -177,8 +177,8 @@ const aiPrompt = computed(() => {
   } else {
     lines.push(
       isExtract.value
-        ? 'Create a MediaChips path-tag regex.'
-        : 'Create a JavaScript RegExp for MediaChips matching.',
+        ? 'Create an Overdrive path-tag regex.'
+        : 'Create a JavaScript RegExp for Overdrive matching.',
     )
   }
   lines.push('Return ONLY JSON: {"pattern":"...","replace":"$1","explanation":"..."}')

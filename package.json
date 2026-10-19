@@ -1,15 +1,15 @@
 {
   "name": "mediachips",
-  "productName": "MediaChips",
+  "productName": "Overdrive",
   "version": "1.12.0",
   "author": {
-    "name": "MediaChips contributors"
+    "name": "Project-Colony and MediaChips contributors"
   },
-  "homepage": "https://mediachips.app",
+  "homepage": "https://github.com/Project-Colony/Overdrive",
   "description": "Organize your media files with ease and convenience.",
   "private": false,
-  "license": "GPL-3.0",
-  "repository": "github:fupdec/MediaChips",
+  "license": "GPL-3.0-only",
+  "repository": "github:Project-Colony/Overdrive",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
@@ -145,9 +145,9 @@
     "not dead"
   ],
   "build": {
-    "appId": "com.mediachips.app",
-    "productName": "MediaChips",
-    "copyright": "Copyright © 2026 MediaChips",
+    "appId": "com.projectcolony.overdrive",
+    "productName": "Overdrive",
+    "copyright": "Copyright © 2020-2026 MediaChips contributors; 2026 Project-Colony",
     "beforePack": "./scripts/electron-before-pack.mjs",
     "directories": {
       "output": "release"
@@ -198,19 +198,6 @@
       "artifactName": "${productName}.v${version}.Windows.Installer.${ext}",
       "verifyUpdateCodeSignature": false,
       "icon": "public/icons/icon.png"
-    },
-    "appx": {
-      "applicationId": "mediaChips",
-      "identityName": "38214VitalyKrivoshei.mediaChips",
-      "publisherDisplayName": "Vitaly Krivoshei",
-      "displayName": "mediaChips",
-      "publisher": "CN=CD9954BD-179A-41DA-A241-063D0F1B3AA6",
-      "languages": [
-        "en-US",
-        "ru-RU",
-        "es-ES",
-        "zh-CN"
-      ]
     },
     "portable": {
       "artifactName": "${productName}.v${version}.Windows.Portable.${ext}"
@@ -277,8 +264,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "fupdec",
-      "repo": "MediaChips"
+      "owner": "Project-Colony",
+      "repo": "Overdrive"
     }
   },
   "allowScripts": {

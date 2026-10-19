@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "MediaChips",
-  "short_name": "MediaChips",
+  "name": "Overdrive",
+  "short_name": "Overdrive",
   "description": "Organize and play your media library from this device or your phone on the LAN.",
   "start_url": "/",
   "scope": "/",

@@ -22,7 +22,7 @@ function isPortInUse(port) {
 
 async function ensurePortAvailable() {
   if (await isPortInUse(E2E_PORT)) {
-    console.error(`Port ${E2E_PORT} is already in use. Stop MediaChips/Electron before running E2E tests.`)
+    console.error(`Port ${E2E_PORT} is already in use. Stop Overdrive/Electron before running E2E tests.`)
     console.error(`Find the process: lsof -i :${E2E_PORT}`)
     process.exit(1)
   }

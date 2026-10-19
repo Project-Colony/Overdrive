@@ -2,7 +2,7 @@
   "name": "@mediachips/plugin-jellyfin",
   "version": "0.1.0",
   "private": true,
-  "description": "MediaChips Jellyfin import plugin. Import library metadata from a Jellyfin server.",
+  "description": "Overdrive Jellyfin import plugin. Import library metadata from a Jellyfin server.",
   "license": "GPL-3.0",
   "type": "module",
   "main": "./src/index.ts",

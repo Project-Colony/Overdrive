@@ -65,7 +65,7 @@ if (app.isPackaged) {
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
-  console.warn('MediaChips is already running. Exiting second instance.')
+  console.warn('Overdrive is already running. Exiting second instance.')
   process.exit(0)
 }
 
@@ -76,9 +76,10 @@ if (
   app.disableHardwareAcceleration()
 }
 
-// Keep Portable/installer taskbar grouping on the MediaChips identity (not Electron's default).
+// Keep Portable/installer taskbar grouping on the app identity (not Electron's default).
+// Must equal package.json build.appId so toasts and shortcuts match the installer.
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.mediachips.app')
+  app.setAppUserModelId('com.projectcolony.overdrive')
 }
 
 const isWindows = os.type() === 'Windows_NT'
@@ -155,7 +156,7 @@ try {
   apiSupervisor.start()
   console.log(`[startup] API process spawned (+${Date.now() - startupStartedAt}ms)`)
 } catch (error) {
-  console.error('Failed to start MediaChips API server process:', error)
+  console.error('Failed to start Overdrive API server process:', error)
   app.quit()
   process.exit(1)
 }

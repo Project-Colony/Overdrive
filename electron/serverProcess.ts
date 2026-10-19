@@ -21,7 +21,7 @@ export function resolveServerScriptPath(appRoot: string): string {
     if (fs.existsSync(candidate)) return candidate
   }
   throw new Error(
-    `MediaChips server script not found under ${appRoot} (expected .backend-build/app/server.js)`,
+    `Overdrive server script not found under ${appRoot} (expected .backend-build/app/server.js)`,
   )
 }
 
@@ -263,12 +263,12 @@ export function createServerProcessSupervisor(options: {
         if (stopping) return
 
         logError(
-          `MediaChips API server exited unexpectedly (code=${code}, signal=${signal})`,
+          `Overdrive API server exited unexpectedly (code=${code}, signal=${signal})`,
         )
 
         if (consecutiveCrashRestarts >= maxConsecutiveRestarts) {
           logError(
-            `MediaChips API auto-respawn stopped after ${maxConsecutiveRestarts} consecutive crashes`,
+            `Overdrive API auto-respawn stopped after ${maxConsecutiveRestarts} consecutive crashes`,
           )
           return
         }
@@ -344,7 +344,7 @@ export function createServerProcessSupervisor(options: {
       return await restartInFlight
     } catch (error) {
       logError(
-        `Failed to restart MediaChips API server: ${
+        `Failed to restart Overdrive API server: ${
           error instanceof Error ? error.message : String(error)
         }`,
       )

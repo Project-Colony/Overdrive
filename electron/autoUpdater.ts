@@ -3,8 +3,8 @@ import {execSync} from 'child_process'
 import {autoUpdater, type UpdateInfo, type ProgressInfo} from 'electron-updater'
 
 import { apiErrorMessage } from '../api/types/errors'
-export const RELEASES_URL = 'https://github.com/fupdec/MediaChips/releases/latest'
-const RELEASES_BASE = 'https://github.com/fupdec/MediaChips/releases/download'
+export const RELEASES_URL = 'https://github.com/Project-Colony/Overdrive/releases/latest'
+const RELEASES_BASE = 'https://github.com/Project-Colony/Overdrive/releases/download'
 
 type UpdaterState = {
   state: string
@@ -50,7 +50,7 @@ export function requiresManualInstall(): boolean {
 
 function getMacDmgUrl(version: string): string {
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
-  return `${RELEASES_BASE}/v${version}/MediaChips.v${version}.Mac.${arch}.dmg`
+  return `${RELEASES_BASE}/v${version}/Overdrive.v${version}.Mac.${arch}.dmg`
 }
 
 function isSignatureValidationError(message: unknown): boolean {

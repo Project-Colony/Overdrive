@@ -437,8 +437,8 @@ export function buildRegexAssistPrompt(context: Record<string, unknown>): string
   const sample = String(context.sample || '')
   const parts = [
     extractMode
-      ? 'Task: invent a SHORT JavaScript RegExp SOURCE for MediaChips path/tag extraction.'
-      : 'Task: invent a SHORT JavaScript RegExp SOURCE for MediaChips text matching.',
+      ? 'Task: invent a SHORT JavaScript RegExp SOURCE for Overdrive path/tag extraction.'
+      : 'Task: invent a SHORT JavaScript RegExp SOURCE for Overdrive text matching.',
     'Return ONLY a JSON object (no markdown fences, no commentary) with keys: pattern, replace, explanation.',
     'Rules:',
     '- pattern = a SHORT regex fragment only (usually under ~40 chars). Never a full file path.',
@@ -482,7 +482,7 @@ export function buildFilterAssistPrompt(context: Record<string, unknown>): strin
   })
 
   const parts = [
-    'Design MediaChips Filters-drawer rows. Return ONLY JSON: summary, filters, suggestions, explanation.',
+    'Design Overdrive Filters-drawer rows. Return ONLY JSON: summary, filters, suggestions, explanation.',
     'Each filter: { "param": <exact availableFields param>, "type", "cond", "val" }.',
     'Conditions by type:',
     ...Object.entries(FILTER_CONDITIONS_BY_TYPE).map(
@@ -525,7 +525,7 @@ export function buildFilterAssistPrompt(context: Record<string, unknown>): strin
 
 export function buildMetaAssistPrompt(context: Record<string, unknown>): string[] {
   return [
-    'Help configure MediaChips metadata fields (chips).',
+    'Help configure Overdrive metadata fields (chips).',
     'Return ONLY a JSON object (no markdown fences) with keys: summary, suggestions (string array of 3–6 concrete setup tips), explanation.',
     'Focus on practical settings the user can toggle: visibility, path parsing, nested tags, synonyms, pinned child fields.',
     `Context: ${JSON.stringify(context || {})}`,

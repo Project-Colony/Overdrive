@@ -1,6 +1,6 @@
 # TMDB scraper
 
-Uses the official [TMDB API v3](https://developer.themoviedb.org/docs/getting-started) to search movies and apply metadata to MediaChips media items.
+Uses the official [TMDB API v3](https://developer.themoviedb.org/docs/getting-started) to search movies and apply metadata to Overdrive media items.
 
 ## Setup
 

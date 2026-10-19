@@ -134,7 +134,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "Website",
     toggleDevTools: "Toggle Developer Tools",
     about: "About",
-    aboutMediaChips: "About MediaChips",
+    aboutMediaChips: "About Overdrive",
   },
   ru: {
     menuFile: "Файл",
@@ -174,7 +174,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "Сайт",
     toggleDevTools: "Инструменты разработчика",
     about: "О приложении",
-    aboutMediaChips: "О MediaChips",
+    aboutMediaChips: "О программе Overdrive",
   },
   de: {
     menuFile: "Datei",
@@ -214,7 +214,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "Webseite",
     toggleDevTools: "Entwicklertools umschalten",
     about: "Über",
-    aboutMediaChips: "Über MediaChips",
+    aboutMediaChips: "Über Overdrive",
   },
   es: {
     menuFile: "Archivo",
@@ -254,7 +254,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "Sitio web",
     toggleDevTools: "Herramientas de desarrollo",
     about: "Acerca de",
-    aboutMediaChips: "Acerca de MediaChips",
+    aboutMediaChips: "Acerca de Overdrive",
   },
   fr: {
     menuFile: "Fichier",
@@ -294,7 +294,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "Site Web",
     toggleDevTools: "Basculer les outils de développement",
     about: "À propos",
-    aboutMediaChips: "À propos de MediaChips",
+    aboutMediaChips: "À propos d'Overdrive",
   },
   ja: {
     menuFile: "ファイル",
@@ -334,7 +334,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "Webサイト",
     toggleDevTools: "開発者ツールの切り替え",
     about: "について",
-    aboutMediaChips: "MediaChips について",
+    aboutMediaChips: "Overdrive について",
   },
   pt: {
     menuFile: "Arquivo",
@@ -374,7 +374,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "Site",
     toggleDevTools: "Alternar ferramentas de desenvolvedor",
     about: "Sobre",
-    aboutMediaChips: "Sobre MediaChips",
+    aboutMediaChips: "Sobre o Overdrive",
   },
   cn: {
     menuFile: "文件",
@@ -414,7 +414,7 @@ const STRINGS: Record<AppMenuLocale, AppMenuChromeLabels> = {
     website: "网站",
     toggleDevTools: "开发者工具",
     about: "关于",
-    aboutMediaChips: "关于 MediaChips",
+    aboutMediaChips: "关于 Overdrive",
   },
 }
 

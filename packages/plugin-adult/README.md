@@ -1,6 +1,6 @@
 # @mediachips/plugin-adult
 
-Bundled MediaChips plugin for adult scrapers / ThePornDB / CamGirlFinder.
+Bundled Overdrive plugin for adult scrapers / ThePornDB / CamGirlFinder.
 
 Lives under `packages/` for co-development; can be extracted to a separate repo later.
 
@@ -54,7 +54,7 @@ aliases, gender, photos, and profile links.
 ## Develop against the app
 
 ```bash
-# from MediaChips root
+# from the Overdrive root
 npm run electron   # or npm run dev
 npm run test:plugin-adult
 ```

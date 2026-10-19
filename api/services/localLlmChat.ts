@@ -58,7 +58,7 @@ export function buildLocalAiSystemPrompt(req: LocalAiChatPromptRequest, docsText
   const locale = normalizeAppUiLocale(req.locale)
   const mode = req.mode || 'chat'
   const parts = [
-    'You are MediaChips Local AI assistant. Stay local-only: never suggest cloud AI services.',
+    'You are Overdrive Local AI assistant. Stay local-only: never suggest cloud AI services.',
     languageInstruction(locale),
     'Be concise and practical.',
   ]
@@ -211,7 +211,7 @@ export function resolveLocalAiPromptText(input: {
   fallback?: string
 }): string {
   const lastUser = input.history.length ? input.history[input.history.length - 1] : null
-  return lastUser?.content || input.userText || input.fallback || 'Help me with MediaChips.'
+  return lastUser?.content || input.userText || input.fallback || 'Help me with Overdrive.'
 }
 
 export function resolveLocalAiMaxTokens(mode?: string | null): number {

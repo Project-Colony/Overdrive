@@ -2,7 +2,7 @@
   "name": "@mediachips/plugin-tmdb",
   "version": "0.1.0",
   "private": true,
-  "description": "MediaChips TMDB movie scraper using the official The Movie Database API.",
+  "description": "Overdrive TMDB movie scraper using the official The Movie Database API.",
   "license": "GPL-3.0",
   "type": "module",
   "main": "./src/index.ts",

@@ -1,6 +1,6 @@
 # Adult features plugin
 
-Official MediaChips plugin for performer/scene scrapers and ThePornDB.
+Official Overdrive plugin for performer/scene scrapers and ThePornDB.
 
 ## Who needs this zip?
 
@@ -12,7 +12,7 @@ Official MediaChips plugin for performer/scene scrapers and ThePornDB.
 ## Install (Store channel)
 
 1. Download `mediachips.adult-0.1.0.zip` from [mediachips.app/plugins](https://mediachips.app/plugins)
-2. Open MediaChips → Settings → Plugins → **Install from zip**
+2. Open Overdrive → Settings → Plugins → **Install from zip**
 3. Enable **Adult features** in the list
 4. Turn on adult content in Privacy settings and set your ThePornDB API key under Adult
 

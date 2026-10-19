@@ -141,7 +141,7 @@ const {
 
 const show = ref(false)
 const isDownloading = ref(false)
-const releasesUrl = 'https://github.com/fupdec/MediaChips/releases/latest'
+const releasesUrl = 'https://github.com/Project-Colony/Overdrive/releases/latest'
 
 const message = computed(() => {
   switch (status.value.state) {

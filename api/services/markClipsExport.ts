@@ -7,11 +7,11 @@ import {concatVideoSegments, cutVideoSegment} from '../utils/ffmpeg'
 
 function defaultClipsOutputPath() {
   const downloads = path.join(os.homedir(), 'Downloads')
-  return path.join(downloads, `mediachips-clips-${Date.now()}.mp4`)
+  return path.join(downloads, `overdrive-clips-${Date.now()}.mp4`)
 }
 
 function defaultClipsOutputDir() {
-  return path.join(os.homedir(), 'Downloads', `mediachips-clips-${Date.now()}`)
+  return path.join(os.homedir(), 'Downloads', `overdrive-clips-${Date.now()}`)
 }
 
 function safeSegmentName(clip: {name?: string; basename?: string; markId: number}, index: number) {

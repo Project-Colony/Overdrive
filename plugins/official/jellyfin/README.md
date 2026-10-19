@@ -1,3 +1,3 @@
 # Jellyfin import plugin
 
-Official MediaChips plugin zip for Jellyfin library import.
+Official Overdrive plugin zip for Jellyfin library import.

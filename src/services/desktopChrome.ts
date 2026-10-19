@@ -98,7 +98,7 @@ export async function maybeShowOsNotification(notification: NotificationInput): 
   if (await isDesktopAppUserFacing()) return
   if (!shouldShowOsNotification(notification)) return
 
-  const title = String(notification.title || 'MediaChips').trim() || 'MediaChips'
+  const title = String(notification.title || 'Overdrive').trim() || 'Overdrive'
   const body = String(notification.text || '').trim()
   const revealPath = typeof notification.revealPath === 'string'
     ? notification.revealPath.trim()

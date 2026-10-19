@@ -414,7 +414,7 @@ export function createAppTrayController(deps: {
         preferLightGlyph: trayPrefersLightGlyph(),
       })
       tray = new Tray(image.isEmpty() ? iconPath : image)
-      tray.setToolTip('MediaChips')
+      tray.setToolTip('Overdrive')
       applyContextMenu()
       bindTrayThemeListener()
 

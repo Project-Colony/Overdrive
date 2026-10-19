@@ -328,12 +328,12 @@ const filterAiPrompt = computed(() => {
     : (currentMediaType.value?.type || 'media')
   if (activeCount > 0) {
     return [
-      `Improve my MediaChips filters for this ${kind} library page.`,
+      `Improve my Overdrive filters for this ${kind} library page.`,
       'Return JSON with ready-to-apply filters using only available fields.',
     ].join(' ')
   }
   return [
-    `Help me design useful MediaChips filters for this ${kind} library page.`,
+    `Help me design useful Overdrive filters for this ${kind} library page.`,
     'Return JSON with ready-to-apply filters using only available fields.',
   ].join(' ')
 })

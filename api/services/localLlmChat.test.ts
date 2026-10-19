@@ -119,7 +119,7 @@ describe('localLlmChat', () => {
       history: [{role: 'user', content: 'last'}],
       userText: 'earlier',
     })).toBe('last')
-    expect(resolveLocalAiPromptText({history: [], userText: ''})).toBe('Help me with MediaChips.')
+    expect(resolveLocalAiPromptText({history: [], userText: ''})).toBe('Help me with Overdrive.')
     expect(resolveLocalAiMaxTokens('chat')).toBe(768)
     expect(resolveLocalAiMaxTokens('filter')).toBe(640)
   })

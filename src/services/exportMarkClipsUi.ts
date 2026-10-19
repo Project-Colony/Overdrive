@@ -109,7 +109,7 @@ export async function runMarkClipsExport(options: {
 
   const picked = mode === 'folder'
     ? await pickExportOutputFolder()
-    : await pickExportOutputPath(`mediachips-clips-${Date.now()}.mp4`)
+    : await pickExportOutputPath(`overdrive-clips-${Date.now()}.mp4`)
   if (picked === null) return false
   const outputPath = picked || undefined
 

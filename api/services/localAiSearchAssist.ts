@@ -68,7 +68,7 @@ export function buildSearchAssistPrompt(context: Record<string, unknown>): strin
   })
 
   return [
-    'Interpret a MediaChips global-search request.',
+    'Interpret an Overdrive global-search request.',
     'Return ONLY JSON (no markdown) with keys: query, tags, explanation.',
     '- query = residual free-text for FTS (may be empty string).',
     '- tags = array of EXACT tag names chosen ONLY from candidateTags below (0–5 names).',

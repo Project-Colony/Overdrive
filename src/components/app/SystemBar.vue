@@ -75,7 +75,7 @@ function isActionChecked(action: SystemMenuAction) {
 }
 const {colorRGBA, gradient} = useHeaderBarStyle('system')
 
-const app_title = computed(() => appStore.app_title || 'MediaChips')
+const app_title = computed(() => appStore.app_title || 'Overdrive')
 
 const minimize = () => {}
 

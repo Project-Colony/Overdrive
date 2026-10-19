@@ -82,7 +82,7 @@
         alt=""
         class="app-startup-splash__logo"
       >
-      <div class="app-startup-splash__name">MediaChips</div>
+      <div class="app-startup-splash__name">Overdrive</div>
       <div class="app-startup-splash__tagline">{{ t('aboutApp.tagline') }}</div>
     </div>
 

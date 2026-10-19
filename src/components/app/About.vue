@@ -26,7 +26,7 @@
           {{ t('aboutApp.version_history') }}
         </v-btn>
         <v-btn
-          @click="openLink('https://mediachips.app/')"
+          @click="openLink('https://github.com/Project-Colony/Overdrive')"
           class="px-5 mt-2 mr-2"
           color="#7059b7"
           rounded
@@ -39,7 +39,7 @@
       </div>
       <v-spacer></v-spacer>
       <div class="text-center d-flex flex-column">
-        <img :src="logoPath" alt="MediaChips" width="64" height="64"/>
+        <img :src="logoPath" alt="Overdrive" width="64" height="64"/>
         <span>{{ currentYear }}</span>
       </div>
     </div>
@@ -146,7 +146,7 @@ const openLink = (link: string) => {
 }
 
 const openReleases = () => {
-  openLink(String(status.value.releasesUrl || 'https://github.com/fupdec/MediaChips/releases/latest'))
+  openLink(String(status.value.releasesUrl || 'https://github.com/Project-Colony/Overdrive/releases/latest'))
 }
 
 async function handleCheckUpdates() {

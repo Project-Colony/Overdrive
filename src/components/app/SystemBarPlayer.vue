@@ -46,7 +46,7 @@ const maximized = ref(false)
 
 const appTitle = computed(() => {
   if (mediaWindowTitle.value) return mediaWindowTitle.value
-  return appStore.app_title || 'MediaChips'
+  return appStore.app_title || 'Overdrive'
 })
 
 // Методы окон (теперь вызываются из WindowControls через emits)

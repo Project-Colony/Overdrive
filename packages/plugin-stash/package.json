@@ -2,7 +2,7 @@
   "name": "@mediachips/plugin-stash",
   "version": "0.1.0",
   "private": true,
-  "description": "MediaChips Stash import plugin. Import library metadata from stash-go.sqlite.",
+  "description": "Overdrive Stash import plugin. Import library metadata from stash-go.sqlite.",
   "license": "GPL-3.0",
   "type": "module",
   "main": "./src/index.ts",

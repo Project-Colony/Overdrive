@@ -3,8 +3,8 @@
  * Packaging entry.
  *
  * Channels:
- * 1. **Standard** — adult bundled, requires activation key. `npm run dist`
- * 2. **SFW / store smoke** — adult not bundled; still requires key. `npm run dist:store`
+ * 1. **Standard** — adult bundled. `npm run dist`
+ * 2. **SFW / store smoke** — adult not bundled. `npm run dist:store`
  * 3. **Microsoft Store AppX** — adult not bundled + license bypass. `npm run dist:msstore`
  *    (`MEDIA_CHIPS_SFW=1` + `MEDIA_CHIPS_MSSTORE=1`)
  *
@@ -95,9 +95,9 @@ const childEnv = {
 if (msStoreTarget) {
   console.log('[dist] Microsoft Store AppX — adult stripped + license bypass (MEDIA_CHIPS_MSSTORE=1)')
 } else if (storeBuild) {
-  console.log('[dist] SFW/store smoke (MEDIA_CHIPS_SFW=1) — adult not bundled; activation key still required')
+  console.log('[dist] SFW/store smoke (MEDIA_CHIPS_SFW=1) — adult not bundled')
 } else {
-  console.log('[dist] Standard channel — adult plugin bundled; activation key required')
+  console.log('[dist] Standard channel — adult plugin bundled')
 }
 
 run('node', ['scripts/compile.mjs', 'artifacts'], childEnv)

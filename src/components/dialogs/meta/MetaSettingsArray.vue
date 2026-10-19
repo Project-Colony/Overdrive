@@ -500,7 +500,7 @@ const pathRegexSamplePath = ref(defaultPathRegexSample.samplePath)
 const pathRegexCaptureText = ref(defaultPathRegexSample.captureText)
 
 const metaAiPrompt = computed(() => (
-  'Suggest how to configure this MediaChips metadata category (chips). Return JSON with summary, suggestions, explanation.'
+  'Suggest how to configure this Overdrive metadata category (chips). Return JSON with summary, suggestions, explanation.'
 ))
 const metaAiContext = computed(() => ({
   name: props.meta?.name,

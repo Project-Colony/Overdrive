@@ -6,7 +6,7 @@ export const useAppStore = defineStore('app', {
     is_app_ready: false,
     localhost: '',
     appVersion: '0.1.0',
-    app_title: 'MediaChips',
+    app_title: 'Overdrive',
     dbPath: '',
     mediaPath: '',
     databases: [],

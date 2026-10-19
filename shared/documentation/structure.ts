@@ -490,7 +490,7 @@ export const docs = [
       },
       {
         id: 'settings.about',
-        name: 'About and registration',
+        name: 'About',
         icon: 'mdi-information-outline',
         selector: ['#settings-doc-tab-about', '#settings-registration'],
         navigate: '/settings?tab=about&section=registration',

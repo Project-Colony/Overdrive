@@ -2,7 +2,7 @@
   "name": "@mediachips/plugin-emby",
   "version": "0.1.0",
   "private": true,
-  "description": "MediaChips Emby import plugin. Import library metadata from an Emby server (Jellyfin-compatible API).",
+  "description": "Overdrive Emby import plugin. Import library metadata from an Emby server (Jellyfin-compatible API).",
   "license": "GPL-3.0",
   "type": "module",
   "main": "./src/index.ts",

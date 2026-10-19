@@ -25,7 +25,7 @@ import {
 } from '@shared/electron/appMenuState'
 import type {SettingsState} from '@/types/settings'
 
-const WEBSITE_URL = 'https://mediachips.app/'
+const WEBSITE_URL = 'https://github.com/Project-Colony/Overdrive'
 
 function runEditCommand(command: string) {
   document.execCommand(command, false)

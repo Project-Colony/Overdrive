@@ -100,8 +100,8 @@ describe('buildTrayMenuTemplate', () => {
       .map((item) => ('label' in item ? item.label : item.type))
 
     expect(labels).toEqual([
-      'Show MediaChips',
-      'Hide MediaChips',
+      'Show Overdrive',
+      'Hide Overdrive',
       'separator',
       'Add Media',
       'Settings',
@@ -118,7 +118,7 @@ describe('buildTrayMenuTemplate', () => {
     const labels = buildTrayMenuTemplate(deps)
       .map((item) => ('label' in item ? item.label : item.type))
 
-    expect(labels).toContain('Показать MediaChips')
+    expect(labels).toContain('Показать Overdrive')
     expect(labels).toContain('Добавить медиа')
     expect(labels).toContain('Настройки')
     expect(labels).toContain('Выход')
@@ -144,10 +144,10 @@ describe('buildTrayMenuTemplate', () => {
     const byLabel = (label: string) =>
       items.find((item) => 'label' in item && item.label === label)
 
-    byLabel('Show MediaChips')?.click?.(undefined as never, undefined as never, undefined as never)
+    byLabel('Show Overdrive')?.click?.(undefined as never, undefined as never, undefined as never)
     expect(deps.showMainWindow).toHaveBeenCalled()
 
-    byLabel('Hide MediaChips')?.click?.(undefined as never, undefined as never, undefined as never)
+    byLabel('Hide Overdrive')?.click?.(undefined as never, undefined as never, undefined as never)
     expect(deps.hideMainWindow).toHaveBeenCalled()
 
     byLabel('Add Media')?.click?.(undefined as never, undefined as never, undefined as never)
@@ -182,8 +182,8 @@ describe('buildDockMenuTemplate', () => {
       .map((item) => ('label' in item ? item.label : item.type))
 
     expect(labels).toEqual([
-      'Show MediaChips',
-      'Hide MediaChips',
+      'Show Overdrive',
+      'Hide Overdrive',
       'separator',
       'Add Media',
       'Settings',

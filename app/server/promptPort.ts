@@ -23,7 +23,7 @@ function buildPromptHtml(busyPort: number, defaultPort: number, channel: string)
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>MediaChips</title>
+  <title>Overdrive</title>
   <style>
     :root { color-scheme: light dark; }
     body {
@@ -70,7 +70,7 @@ function buildPromptHtml(busyPort: number, defaultPort: number, channel: string)
 </head>
 <body>
   <h1>Port ${busyPort} is already in use</h1>
-  <p>Another application is using this port. Enter a different port for MediaChips.</p>
+  <p>Another application is using this port. Enter a different port for Overdrive.</p>
   <label for="port">Port</label>
   <input id="port" type="number" min="1" max="65535" value="${defaultPort}" autofocus />
   <div class="actions">
@@ -154,7 +154,7 @@ async function promptPortViaElectronWindow(
       alwaysOnTop: true,
       center: true,
       show: false,
-      title: 'MediaChips',
+      title: 'Overdrive',
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -188,7 +188,7 @@ async function promptPortDarwin(busyPort: number, defaultPort: number): Promise<
   const script = [
     'tell application "System Events"',
     'activate',
-    `set dialogResult to display dialog "Port ${busyPort} is already in use by another application." & return & return & "Enter a different port:" default answer "${defaultPort}" with title "MediaChips" buttons {"Quit", "Use Port"} default button "Use Port" cancel button "Quit"`,
+    `set dialogResult to display dialog "Port ${busyPort} is already in use by another application." & return & return & "Enter a different port:" default answer "${defaultPort}" with title "Overdrive" buttons {"Quit", "Use Port"} default button "Use Port" cancel button "Quit"`,
     'return text returned of dialogResult',
     'end tell',
   ].join('\n')
@@ -206,7 +206,7 @@ async function promptPortWindows(busyPort: number, defaultPort: number): Promise
   const message = `Port ${busyPort} is already in use by another application.\\r\\n\\r\\nEnter a different port:`
   const ps = [
     'Add-Type -AssemblyName Microsoft.VisualBasic',
-    `$result = [Microsoft.VisualBasic.Interaction]::InputBox("${message}", "MediaChips", "${defaultPort}")`,
+    `$result = [Microsoft.VisualBasic.Interaction]::InputBox("${message}", "Overdrive", "${defaultPort}")`,
     'Write-Output $result',
   ].join('; ')
 
@@ -230,7 +230,7 @@ async function promptPortLinux(busyPort: number, defaultPort: number): Promise<s
   try {
     const {stdout} = await execFileAsync(
       'zenity',
-      ['--entry', '--title=MediaChips', `--text=${text}`, `--entry-text=${defaultPort}`],
+      ['--entry', '--title=Overdrive', `--text=${text}`, `--entry-text=${defaultPort}`],
       {timeout: 600000},
     )
     return stdout.trim()
@@ -241,7 +241,7 @@ async function promptPortLinux(busyPort: number, defaultPort: number): Promise<s
   try {
     const {stdout} = await execFileAsync(
       'kdialog',
-      ['--title', 'MediaChips', '--inputbox', text, String(defaultPort)],
+      ['--title', 'Overdrive', '--inputbox', text, String(defaultPort)],
       {timeout: 600000},
     )
     return stdout.trim()

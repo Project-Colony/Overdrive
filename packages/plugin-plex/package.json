@@ -2,7 +2,7 @@
   "name": "@mediachips/plugin-plex",
   "version": "0.1.0",
   "private": true,
-  "description": "MediaChips Plex import plugin. Import library metadata from a Plex server.",
+  "description": "Overdrive Plex import plugin. Import library metadata from a Plex server.",
   "license": "GPL-3.0",
   "type": "module",
   "main": "./src/index.ts",

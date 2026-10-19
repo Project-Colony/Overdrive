@@ -117,7 +117,7 @@ function registerBuiltinRoutes({
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
   <meta name="theme-color" content="#9875c6"/>
-  <title>MediaChips — clear cache</title>
+  <title>Overdrive — clear cache</title>
   <style>
     body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#f5f3fa;color:#2c2940;text-align:center}
     .card{max-width:26rem;padding:1.5rem;border-radius:16px;background:#fff;box-shadow:0 8px 28px rgba(80,70,140,.12)}
@@ -129,7 +129,7 @@ function registerBuiltinRoutes({
 </head>
 <body>
   <div class="card">
-    <h1>Refresh MediaChips</h1>
+    <h1>Refresh Overdrive</h1>
     <p id="status">Clearing offline cache…</p>
     <button id="go" type="button" hidden>Open app</button>
   </div>

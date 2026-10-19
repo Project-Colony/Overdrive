@@ -28,7 +28,7 @@ test.describe('Navigation', () => {
   test('switches settings to about tab', async ({ page }) => {
     await openSettingsTab(page, 'settings-doc-tab-about')
 
-    await expect(page.getByText(/MediaChips/i).first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(/Overdrive/i).first()).toBeVisible({ timeout: 30_000 })
   })
 
   test('home page shows main shell without login dialog on fresh server', async ({ page }) => {

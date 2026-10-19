@@ -80,7 +80,7 @@ export function ensurePreferredNodeOrExit(cwd = process.cwd()) {
   if (!preferredNode) {
     if (getNodeMajor() < MIN_NODE_MAJOR) {
       console.error(
-        `[mediachips] Node ${MIN_NODE_MAJOR}+ required (current: ${process.version}).`,
+        `[overdrive] Node ${MIN_NODE_MAJOR}+ required (current: ${process.version}).`,
         'Install with nvm: nvm install 22',
       )
       process.exit(1)
@@ -92,7 +92,7 @@ export function ensurePreferredNodeOrExit(cwd = process.cwd()) {
     return
   }
 
-  console.log(`[mediachips] switching to ${preferredNode}`)
+  console.log(`[overdrive] switching to ${preferredNode}`)
   const result = spawnSync(preferredNode, process.argv.slice(1), {
     cwd,
     stdio: 'inherit',

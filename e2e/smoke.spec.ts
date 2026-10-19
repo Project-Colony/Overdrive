@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test('loads the home page shell', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page).toHaveTitle(/MediaChips/)
+  await expect(page).toHaveTitle(/Overdrive/)
   await expect(page.locator('#app')).toBeVisible()
   await expect(page.locator('.v-application')).toBeVisible({timeout: 30_000})
 })

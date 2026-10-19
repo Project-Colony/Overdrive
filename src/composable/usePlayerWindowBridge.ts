@@ -25,7 +25,7 @@ export function usePlayerWindowBridge({
   const isPlayerWindow = computed(() => isStandalonePlayerRoute(route))
 
   const buildPlayerWindowTitle = (item: MediaItem | null | undefined) => {
-    const base = appStore.app_title || 'MediaChips'
+    const base = appStore.app_title || 'Overdrive'
     const fileName = item?.basename || item?.name
     return fileName ? `${base} - ${fileName}` : base
   }
@@ -40,7 +40,7 @@ export function usePlayerWindowBridge({
   const resetPlayerWindowTitle = () => {
     if (!isPlayerWindow.value) return
     playerStore.mediaWindowTitle = ''
-    document.title = appStore.app_title || 'MediaChips'
+    document.title = appStore.app_title || 'Overdrive'
   }
 
   const updateItemVideo = (

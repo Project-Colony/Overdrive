@@ -46,8 +46,8 @@ describe('buildWindowsJumpListTasks', () => {
       iconPath: 'C:\\icon.ico',
     })
     expect(tasks.map((task) => task.title)).toEqual([
-      'Show MediaChips',
-      'Hide MediaChips',
+      'Show Overdrive',
+      'Hide Overdrive',
       'Add Media',
       'Settings',
       'Lock',
@@ -66,8 +66,8 @@ describe('buildWindowsJumpListTasks', () => {
       locale: 'ru',
     })
     expect(tasks.map((task) => task.title)).toEqual([
-      'Показать MediaChips',
-      'Скрыть MediaChips',
+      'Показать Overdrive',
+      'Скрыть Overdrive',
       'Добавить медиа',
       'Настройки',
       'Заблокировать',

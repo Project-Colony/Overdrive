@@ -20,7 +20,7 @@ export type AssistantToolDef = {
 export const ASSISTANT_TOOLS: AssistantToolDef[] = [
   {
     name: 'search_docs',
-    description: 'Search built-in MediaChips documentation',
+    description: 'Search built-in Overdrive documentation',
     needsConfirmation: false,
   },
   {

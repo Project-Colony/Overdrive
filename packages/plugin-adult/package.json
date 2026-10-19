@@ -2,7 +2,7 @@
   "name": "@mediachips/plugin-adult",
   "version": "0.1.0",
   "private": true,
-  "description": "MediaChips adult features plugin (scrapers, ThePornDB). Develop here; extract to a separate repo when ready.",
+  "description": "Overdrive adult features plugin (scrapers, ThePornDB). Develop here; extract to a separate repo when ready.",
   "license": "GPL-3.0",
   "type": "module",
   "main": "./src/index.ts",

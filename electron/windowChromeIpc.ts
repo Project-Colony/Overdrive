@@ -80,7 +80,7 @@ export function registerWindowChromeIpc(deps: {
 
   ipcMain.handle('showOsNotification', (_event: IpcMainInvokeEvent, raw: unknown) => {
     const payload = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {}
-    const title = String(payload.title || '').trim() || 'MediaChips'
+    const title = String(payload.title || '').trim() || 'Overdrive'
     const body = String(payload.body || '').trim()
     const silent = Boolean(payload.silent)
 

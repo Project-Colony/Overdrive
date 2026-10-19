@@ -70,5 +70,5 @@ export function tpdbKeyMissingMessage(): string {
 }
 
 export function adultPluginDisabledMessage(): string {
-  return 'Adult plugin is disabled. Enable mediachips.adult in Settings → Plugins.'
+  return 'Adult plugin is disabled. Enable "Adult features" in Settings → Plugins.'
 }

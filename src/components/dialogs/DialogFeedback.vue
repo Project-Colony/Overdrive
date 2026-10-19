@@ -120,6 +120,7 @@
 
 <script setup lang="ts">
 import {apiClient} from '@/services/apiClient'
+import {openExternal} from '@/services/shellService'
 import {computed, reactive, ref, watch} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {useAppStore} from '@/stores/app'
@@ -133,7 +134,10 @@ const dialogsStore = useDialogsStore()
 const notificationsStore = useNotificationsStore()
 const {t} = useI18n()
 
-const feedbackApiUrl = import.meta.env.VITE_FEEDBACK_API_URL || 'https://mediachips.app/api/feedback'
+// Overdrive runs no feedback server: without VITE_FEEDBACK_API_URL, sending
+// opens a prefilled issue on the repository instead.
+const feedbackApiUrl = import.meta.env.VITE_FEEDBACK_API_URL || ''
+const FEEDBACK_ISSUES_URL = 'https://github.com/Project-Colony/Overdrive/issues/new'
 const feedback = reactive({
   name: '',
   email: '',
@@ -249,6 +253,15 @@ async function sendFeedback() {
   const screenshotValidationError = getScreenshotValidationError()
   if (screenshotValidationError) {
     feedbackError.value = screenshotValidationError
+    return
+  }
+
+  if (!feedbackApiUrl) {
+    const system = [feedbackSystemInfo.value.os, feedbackSystemInfo.value.osVersion, feedbackSystemInfo.value.arch]
+      .filter(Boolean).join(' ')
+    const body = `${feedback.message.trim()}\n\nOverdrive ${store.appVersion}, ${system}`
+    await openExternal(`${FEEDBACK_ISSUES_URL}?title=${encodeURIComponent(feedback.subject.trim())}&body=${encodeURIComponent(body)}`)
+    dialogsStore.feedback = false
     return
   }
 
