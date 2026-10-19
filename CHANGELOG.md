@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.12.1] - 2026-10-19
+## [1.12.2] - 2026-10-19
 
 First Overdrive release: MediaChips 1.12.0 with the changes below.
 
@@ -22,6 +22,12 @@ First Overdrive release: MediaChips 1.12.0 with the changes below.
 - The built-in server listens on this computer only by default; LAN access is
   opt-in in Settings.
 - Update checks at startup are off by default.
+
+### Security
+
+- Updated the shipped dependencies that had known vulnerabilities: Electron
+  42.11.15, axios 1.20.0, sharp 0.35.5 (librsvg), Vue 3.5.44, proxy-addr and
+  qs (Express), js-yaml, brace-expansion and simple-git.
 
 ## [1.12.0] - 2026-09-02
 
