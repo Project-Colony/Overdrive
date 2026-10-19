@@ -8,6 +8,7 @@ import { isRequestAllowed } from '../../app/server/auth'
 import { applyLanAccessChange, isLanAccessEnabled, isLanAccessEnvLocked } from '../../app/server/lanAccess'
 import { isGlobalAppConfigKey } from '../../shared/appGlobalConfig'
 import { getAppConfigPath } from '../utils/appConfigPath'
+import { hashPassword } from '../utils/passwordHash'
 import { loadConfigFile, saveConfigFile } from '../../app/server/configFile'
 
 export default function (db: ApiDb) {
@@ -87,7 +88,10 @@ export default function (db: ApiDb) {
         throw new HttpError(409, 'Disable LAN access before removing the password')
       }
 
-      settingsRepo.upsertByOption(option, req.body.value)
+      const value = option === 'phrase' && String(req.body.value ?? '') !== ''
+        ? hashPassword(String(req.body.value))
+        : req.body.value
+      settingsRepo.upsertByOption(option, value)
 
       if (option === 'phrase' || option === 'passwordProtection') {
         getAuthService().invalidateSettingsCache()

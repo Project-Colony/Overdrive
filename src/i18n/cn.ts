@@ -2717,6 +2717,7 @@ const cn = {
       password_protection: '密码保护',
       password_protection_hint: '进入应用时需要密码',
       password: '密码',
+      password_keep_hint: '留空以保留当前密码',
       auto_lock_idle: '空闲自动锁定',
       auto_lock_idle_hint: '在一段时间没有鼠标、键盘或触摸操作后锁定应用。需要启用密码保护。',
       auto_lock_idle_off: '关闭',

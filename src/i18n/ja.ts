@@ -2717,6 +2717,7 @@ const ja = {
       password_protection: 'パスワード保護',
       password_protection_hint: 'アプリケーションに入るときにパスワードを要求する',
       password: 'パスワード',
+      password_keep_hint: '現在のパスワードを使い続けるには空のままにします',
       auto_lock_idle: 'アイドル時の自動ロック',
       auto_lock_idle_hint: 'マウス・キーボード・タッチ操作がない時間が続くとアプリをロックします。パスワード保護が必要です。',
       auto_lock_idle_off: 'オフ',

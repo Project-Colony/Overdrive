@@ -173,7 +173,7 @@ describe('Setting.controller', () => {
 
     const res = createResponse()
     await controller.update({params: {option: 'phrase'}, body: {value: 'new-secret'}} as unknown as ApiRequest, res)
-    expect(upsertByOption).toHaveBeenCalledWith('phrase', 'new-secret')
+    expect(upsertByOption).toHaveBeenCalledWith('phrase', expect.stringMatching(/^scrypt\$/))
   })
 
   it('blocks LAN access updates when controlled by environment', async () => {

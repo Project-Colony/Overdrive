@@ -10,7 +10,14 @@ import {createAuthMiddleware, createAuthService} from './auth'
 const settingRows = vi.hoisted(() => ({rows: [] as Array<{option: string; value: string}>}))
 
 vi.mock('../../api/db/repositories/settings', () => ({
-  createSettingsRepository: () => ({findAll: () => settingRows.rows}),
+  createSettingsRepository: () => ({
+    findAll: () => settingRows.rows,
+    upsertByOption: (option: string, value: string) => {
+      const row = settingRows.rows.find((entry) => entry.option === option)
+      if (row) row.value = value
+      else settingRows.rows.push({option, value})
+    },
+  }),
 }))
 
 type TestServer = {
@@ -157,6 +164,8 @@ describe('auth with the real service', () => {
     server = await startRealServer()
 
     expect((await login(server, {password: 'hunter2'})).status).toBe(200)
+    // The plain-text password inherited from MediaChips was rewritten as a hash.
+    expect(settingRows.rows.find((row) => row.option === 'phrase')?.value).toMatch(/^scrypt\$/)
     for (let attempt = 0; attempt < 5; attempt += 1) {
       expect((await login(server, {password: 'wrong'})).status).toBe(401)
     }
@@ -205,7 +214,12 @@ describe('auth with the real service', () => {
       {option: 'tpdbApiKey', value: 'tpdb'},
       {option: 'theme', value: 'dark'},
     ]
-    expect(service.sanitizeSettingRows(rows, true)).toBe(rows)
+    expect(service.sanitizeSettingRows(rows, true)).toEqual([
+      {option: 'phrase', value: ''},
+      {option: 'tmdbApiKey', value: 'tmdb'},
+      {option: 'tpdbApiKey', value: 'tpdb'},
+      {option: 'theme', value: 'dark'},
+    ])
     expect(service.sanitizeSettingRows(rows, false)).toEqual([
       {option: 'phrase', value: ''},
       {option: 'tmdbApiKey', value: ''},

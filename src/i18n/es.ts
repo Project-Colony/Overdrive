@@ -2717,6 +2717,7 @@ const es = {
       password_protection: 'Protección con contraseña',
       password_protection_hint: 'Requerir una contraseña al entrar en la aplicación',
       password: 'Contraseña',
+      password_keep_hint: 'Déjalo vacío para mantener la contraseña actual',
       auto_lock_idle: 'Bloqueo automático por inactividad',
       auto_lock_idle_hint: 'Bloquear la app tras un periodo sin ratón, teclado o toques. Requiere protección con contraseña.',
       auto_lock_idle_off: 'Desactivado',

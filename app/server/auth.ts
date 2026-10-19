@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { createSettingsRepository } from '../../api/db/repositories/settings'
 import { validateBody } from '../../api/middleware/validateBody'
 import { AuthLoginRequestSchema } from '../../shared/schemas/requests'
+import { hashPassword, isPasswordHash, verifyPasswordHash } from '../../api/utils/passwordHash'
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const SETTINGS_CACHE_MS = 10_000
@@ -51,11 +52,18 @@ function createAuthService(db: ApiDb) {
       return settingsCache.settings
     }
 
-    const rows = createSettingsRepository(db.drizzle).findAll() as SettingRow[]
+    const settingsRepo = createSettingsRepository(db.drizzle)
+    const rows = settingsRepo.findAll() as SettingRow[]
     const map = Object.fromEntries(rows.map((row) => [row.option, row.value]))
+    let phrase = map.phrase || ''
+    // Libraries from MediaChips (and older Overdrive builds) store the password in plain text.
+    if (phrase && !isPasswordHash(phrase)) {
+      phrase = hashPassword(phrase)
+      settingsRepo.upsertByOption('phrase', phrase)
+    }
     const settings = {
       passwordProtection: map.passwordProtection === '1',
-      phrase: map.phrase || '',
+      phrase,
     }
 
     settingsCache = {at: Date.now(), settings}
@@ -95,8 +103,8 @@ function createAuthService(db: ApiDb) {
   async function verifyPassword(password: string): Promise<boolean> {
     const settings = await loadSecuritySettings()
     if (!settings.passwordProtection) return true
-    const digest = (value: string) => crypto.createHash('sha256').update(value).digest()
-    return crypto.timingSafeEqual(digest(password), digest(settings.phrase))
+    if (!settings.phrase) return password === ''
+    return verifyPasswordHash(password, settings.phrase)
   }
 
   function extractToken(req: Request): string | null {
@@ -121,13 +129,15 @@ function createAuthService(db: ApiDb) {
   }
 
   /** `allowed`: isRequestAllowed(). /api/setting is public, so others get no credentials. */
+  /** The password hash is never sent, even to the app: the UI only ever writes a new one. */
   function sanitizeSettingRow(row: SettingRow | null, allowed: boolean): SettingRow | null {
-    if (!row || allowed || !SECRET_SETTING_OPTIONS.has(row.option)) return row
+    if (!row || !SECRET_SETTING_OPTIONS.has(row.option)) return row
+    if (allowed && row.option !== 'phrase') return row
     return {...row, value: ''}
   }
 
   function sanitizeSettingRows(rows: SettingRow[], allowed: boolean): SettingRow[] {
-    return allowed ? rows : rows.map((row) => sanitizeSettingRow(row, false) as SettingRow)
+    return rows.map((row) => sanitizeSettingRow(row, allowed) as SettingRow)
   }
 
   setInterval(() => {

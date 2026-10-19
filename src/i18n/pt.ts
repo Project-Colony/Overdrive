@@ -2717,6 +2717,7 @@ const pt = {
       password_protection: 'Proteção por senha',
       password_protection_hint: 'Exigir uma senha ao entrar no aplicativo',
       password: 'Senha',
+      password_keep_hint: 'Deixe vazio para manter a senha atual',
       auto_lock_idle: 'Bloqueio automático por inatividade',
       auto_lock_idle_hint: 'Bloqueia o app após um período sem mouse, teclado ou toque. Requer proteção por senha.',
       auto_lock_idle_off: 'Desligado',

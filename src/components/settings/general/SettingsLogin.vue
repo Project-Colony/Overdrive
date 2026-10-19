@@ -35,8 +35,12 @@ const idleMinutesModel = computed({
   },
 })
 
+// The stored password is a hash the API never sends: the field only takes a new one.
+function savePassword() {
+  if (password.value) void setOption(password.value, 'phrase')
+}
+
 onMounted(() => {
-  password.value = SETTINGS.phrase
   hint.value = SETTINGS.passwordHint
 })
 </script>
@@ -65,11 +69,13 @@ onMounted(() => {
         >
           <v-text-field
             v-model="password"
-            @blur="setOption(password, 'phrase')"
+            @blur="savePassword"
             :type="showPassword ? 'text' : 'password'"
             :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
             @click:append-inner="showPassword = !showPassword"
             :label="t('settings_labels.security.password')"
+            :placeholder="t('settings_labels.security.password_keep_hint')"
+            persistent-placeholder
             rounded
             variant="outlined"
             hide-details
