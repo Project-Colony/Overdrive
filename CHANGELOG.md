@@ -1,11 +1,27 @@
 # Changelog
 
-All notable changes to MediaChips are documented in this file.
+All notable changes to Overdrive are documented in this file. Overdrive is a
+fork of MediaChips; entries up to 1.12.0 are MediaChips releases.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.12.1] - 2026-10-19
+
+First Overdrive release: MediaChips 1.12.0 with the changes below.
+
+### Changed
+
+- Renamed to Overdrive. Settings and libraries live in a new `Overdrive` data
+  folder, separate from any MediaChips install.
+- Every feature is available without an activation key: the 100-item free
+  library limit, the paywall and the activation section in Settings are gone,
+  and the app no longer contacts the MediaChips license server.
+- The built-in server listens on this computer only by default; LAN access is
+  opt-in in Settings.
+- Update checks at startup are off by default.
 
 ## [1.12.0] - 2026-09-02
 
