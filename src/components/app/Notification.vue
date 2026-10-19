@@ -20,7 +20,7 @@
       <div
         @click="collapsed = !collapsed"
         class="notification__text"
-        v-html="displayText"
+        v-text="displayText"
       ></div>
       <div
         v-if="actions.length"

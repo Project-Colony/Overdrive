@@ -54,7 +54,7 @@
         <div
           v-if="tag.synonyms"
           class="item-hover-card__synonyms text-medium-emphasis"
-          v-html="tag.synonyms"
+          v-text="tag.synonyms"
         />
 
         <div

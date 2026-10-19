@@ -12,6 +12,7 @@ import {
 describe('shared/docRetrieval', () => {
   it('strips html and tokenizes text', () => {
     expect(stripDocHtml('<p>Hello&nbsp;<b>world</b></p>')).toBe('Hello world')
+    expect(stripDocHtml('&amp;lt;b&amp;gt; &amp;amp;')).toBe('&lt;b&gt; &amp;')
     expect(tokenizeDocText('Add Media-Items now')).toEqual(['add', 'media-items', 'now'])
   })
 

@@ -166,10 +166,10 @@
               </span>
             </div>
             <div class="d-flex align-baseline">
-              <span v-html="search ? item.raw.name_parsed || item.raw.name : item.raw.name"/>
+              <span v-html="search && item.raw.name_parsed ? item.raw.name_parsed : escapeHtml(item.raw.name)"/>
               <span
                 v-if="meta.synonyms && item.raw.synonyms"
-                v-html="search ? item.raw.synonyms_parsed || item.raw.synonyms : item.raw.synonyms"
+                v-html="search && item.raw.synonyms_parsed ? item.raw.synonyms_parsed : escapeHtml(item.raw.synonyms)"
                 class="synonyms"
               />
             </div>
@@ -275,6 +275,7 @@ import {useItemsListSync} from '@/composable/itemsListSync'
 import {onTagsCatalogChanged, reloadTagsCatalog} from '@/composable/appCatalogs'
 import {createTagsInteractive} from '@/composable/createTagsInteractive'
 import {
+  escapeHtml,
   foundByChars,
   getTagChipTextColor,
   highlightChars,
@@ -483,13 +484,13 @@ const applyTagHighlight = (tagObj: TagFilterItem, queryText: string) => {
 
   if (is_name_found) {
     tagObj.raw.name_parsed = highlightChars(tag.name, queryText, is_default)
-    tagObj.raw.synonyms_parsed = tagObj.raw.synonyms
+    tagObj.raw.synonyms_parsed = escapeHtml(tagObj.raw.synonyms)
     return
   }
 
   if (!tag.synonyms) {
-    tagObj.raw.name_parsed = tag.name
-    tagObj.raw.synonyms_parsed = tag.synonyms
+    tagObj.raw.name_parsed = escapeHtml(tag.name)
+    tagObj.raw.synonyms_parsed = escapeHtml(tag.synonyms)
     return
   }
 
@@ -502,11 +503,11 @@ const applyTagHighlight = (tagObj: TagFilterItem, queryText: string) => {
       : foundByChars(i, query)
 
     synonyms_parsed.push(
-      synonymMatch ? highlightChars(i, queryText, is_default) : i,
+      synonymMatch ? highlightChars(i, queryText, is_default) : escapeHtml(i),
     )
   }
 
-  tagObj.raw.name_parsed = tag.name
+  tagObj.raw.name_parsed = escapeHtml(tag.name)
   tagObj.raw.synonyms_parsed = synonyms_parsed.join(', ')
 }
 

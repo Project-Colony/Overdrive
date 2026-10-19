@@ -29,7 +29,7 @@
         <div
           class="confirm-dialog__text text-body-1"
           :class="variant === 'delete' ? 'error-text' : undefined"
-          v-html="text"
+          v-html="sanitizeInlineHtml(text)"
         />
 
         <v-checkbox
@@ -110,6 +110,7 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
 import {useI18n} from 'vue-i18n'
+import {sanitizeInlineHtml} from '@/services/formatUtils'
 
 const {t} = useI18n()
 

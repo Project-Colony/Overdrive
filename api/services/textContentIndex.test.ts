@@ -16,6 +16,8 @@ describe('textContentIndex', () => {
 
   it('strips html to searchable text', () => {
     expect(stripHtmlToText('<p>Hello <b>world</b></p><script>x()</script>')).toBe('Hello world')
+    expect(stripHtmlToText('a<script>x()</script\t bar>b<style>p{}</style >c')).toBe('a b c')
+    expect(stripHtmlToText('&amp;lt;b&amp;gt; &lt;i&gt;')).toBe('&lt;b&gt; <i>')
   })
 
   it('builds a snippet around the match', () => {

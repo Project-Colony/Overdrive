@@ -30,7 +30,7 @@
         >
           <div
             class="error-dialog__text"
-            v-html="dialogsStore.error.text"
+            v-text="dialogsStore.error.text"
           />
         </v-alert>
       </v-card-text>

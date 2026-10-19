@@ -30,7 +30,7 @@
               <v-icon :color="item.color"> mdi-{{ item.icon }}</v-icon>
             </template>
 
-            <v-list-item-title v-html="item.name" class="text-subtitle-1"/>
+            <v-list-item-title class="text-subtitle-1">{{ item.name }}</v-list-item-title>
           </v-list-item>
 
           <div

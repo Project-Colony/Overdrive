@@ -187,69 +187,88 @@ export function getDateForDB(ms?: number | null): string {
 
 export {foundByChars} from '@shared/tagAutocompleteMatch'
 
+/** Escape text for v-html: names, tags and file content come from the library. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * For i18n copy with <b>, <code> or <br> around interpolated names and paths:
+ * every other tag renders as text. `&` is left alone so text a caller already
+ * escaped is not escaped twice; entities never produce markup.
+ */
+export function sanitizeInlineHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/&lt;(\/?(?:b|code)|br\s*\/?)&gt;/gi, '<$1>')
+}
+
+/** Returns HTML: matches on the raw text, then escapes every piece it emits. */
 export function highlightChars(string: string, query: string, is_default?: boolean): string {
-  const highlight = (str: string, q: string): string => {
-    if (!q) return str
-    const lower = str.toLowerCase()
-    const index = lower.indexOf(q.toLowerCase())
-    if (index >= 0) {
-      return (
-        str.substring(0, index) +
-        '<b>' +
-        str.substring(index, index + q.length) +
-        '</b>' +
-        str.substring(index + q.length)
-      )
-    }
-    return str
-  }
+  const source = String(string ?? '')
+  const lower = source.toLowerCase()
+  const ranges: Array<[number, number]> = []
 
-  if (is_default) return highlight(string, query)
-
-  let res = string
-  if (!query || !string) return string
-
-  for (let i = 0; i < query.length; i++) {
-    const char = query[i]
-    const lastBold = res.lastIndexOf('</b>')
-    if (lastBold >= 0) {
-      res = res.slice(0, lastBold + 4) + highlight(res.slice(lastBold + 4), char)
+  if (query && source) {
+    if (is_default) {
+      const index = lower.indexOf(query.toLowerCase())
+      if (index >= 0) ranges.push([index, index + query.length])
     } else {
-      res = highlight(res, char)
+      // Each query char matches after the previous highlighted one.
+      let from = 0
+      for (let i = 0; i < query.length; i++) {
+        const index = lower.indexOf(query[i].toLowerCase(), from)
+        if (index < 0) continue
+        ranges.push([index, index + 1])
+        from = index + 1
+      }
     }
   }
 
-  return res
+  let res = ''
+  let last = 0
+  for (const [start, end] of ranges) {
+    res += escapeHtml(source.slice(last, start)) + '<b>' + escapeHtml(source.slice(start, end)) + '</b>'
+    last = end
+  }
+  return res + escapeHtml(source.slice(last))
 }
 
 const GLOBAL_SEARCH_WORD_MATCH = /[\p{L}\p{N}]+/gu
 
 function wrapGlobalSearchHighlight(text: string): string {
-  return `<mark class="global-search__hl">${text}</mark>`
+  return `<mark class="global-search__hl">${escapeHtml(text)}</mark>`
 }
 
 /**
  * Highlight text the same way global search matches it:
  * prefer a contiguous query match, otherwise highlight matching word prefixes.
+ * Returns HTML: matching runs on the raw text, every emitted piece is escaped.
  */
 export function highlightGlobalSearchText(text: string, rawQuery: string): string {
   const source = String(text || '')
   const query = String(rawQuery || '').trim()
-  if (!source || !query) return source
+  if (!source || !query) return escapeHtml(source)
 
   const lowerSource = source.toLowerCase()
   const lowerQuery = query.toLowerCase()
   const fullIndex = lowerSource.indexOf(lowerQuery)
   if (fullIndex >= 0) {
     return (
-      source.slice(0, fullIndex)
+      escapeHtml(source.slice(0, fullIndex))
       + wrapGlobalSearchHighlight(source.slice(fullIndex, fullIndex + query.length))
-      + source.slice(fullIndex + query.length)
+      + escapeHtml(source.slice(fullIndex + query.length))
     )
   }
 
   const parts = lowerQuery.split(/\s+/).filter(Boolean)
-  if (!parts.length) return source
+  if (!parts.length) return escapeHtml(source)
 
   let result = ''
   let lastIndex = 0
@@ -258,7 +277,7 @@ export function highlightGlobalSearchText(text: string, rawQuery: string): strin
   for (const match of source.matchAll(GLOBAL_SEARCH_WORD_MATCH)) {
     const token = match[0]
     const index = match.index ?? 0
-    result += source.slice(lastIndex, index)
+    result += escapeHtml(source.slice(lastIndex, index))
 
     const tokenLower = token.toLowerCase()
     const matchedPart = parts.find((part) => tokenMatchesQueryPart(tokenLower, part))
@@ -272,7 +291,7 @@ export function highlightGlobalSearchText(text: string, rawQuery: string): strin
     lastIndex = index + token.length
   }
 
-  result += source.slice(lastIndex)
+  result += escapeHtml(source.slice(lastIndex))
   return result
 }
 

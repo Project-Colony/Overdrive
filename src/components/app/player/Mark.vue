@@ -24,9 +24,9 @@
       <v-img :src="thumb ?? undefined" class="thumb" contain height="100%" width="100%">
         <v-sheet v-if="mark.type !== 'favorite'" class="mark-name">
           <div class="name">
-            <span v-if="mark.type === 'meta'" v-html="mark['tag.name'] || mark.tag?.name"/>
-            <span v-else-if="mark.text" v-html="mark.text" :title="mark.text"/>
-            <span v-else v-html="mark.name"/>
+            <span v-if="mark.type === 'meta'" v-text="mark['tag.name'] || mark.tag?.name"/>
+            <span v-else-if="mark.text" v-text="mark.text" :title="mark.text"/>
+            <span v-else v-text="mark.name"/>
           </div>
         </v-sheet>
 

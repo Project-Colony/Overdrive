@@ -81,7 +81,7 @@
       </span>
 
       <span v-else-if="filter.type === 'number'" class="ml-1">
-        <span v-html="getValForTypeNumber(filter.param, filter.val)"/>
+        <span v-text="getValForTypeNumber(filter.param, filter.val)"/>
       </span>
 
       <span v-else-if="filter.type === 'date'" class="ml-1">

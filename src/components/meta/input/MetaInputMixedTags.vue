@@ -186,10 +186,10 @@
               </v-icon>
             </span>
             <div class="d-flex align-baseline min-width-0">
-              <span v-html="search ? item.raw.name_parsed || item.raw.name : item.raw.name"/>
+              <span v-html="search && item.raw.name_parsed ? item.raw.name_parsed : escapeHtml(item.raw.name)"/>
               <span
                 v-if="item.raw.synonyms"
-                v-html="search ? item.raw.synonyms_parsed || item.raw.synonyms : item.raw.synonyms"
+                v-html="search && item.raw.synonyms_parsed ? item.raw.synonyms_parsed : escapeHtml(item.raw.synonyms)"
                 class="synonyms"
               />
             </div>
@@ -210,6 +210,7 @@ import {onTagsCatalogChanged, reloadTagsCatalog} from '@/composable/appCatalogs'
 import {createTagsInteractive} from '@/composable/createTagsInteractive'
 import {useAutocompleteMenuInfiniteScroll} from '@/composable/useAutocompleteMenuInfiniteScroll'
 import {
+  escapeHtml,
   foundByChars,
   getTagChipTextColor,
   highlightChars,
@@ -593,13 +594,13 @@ function applyHighlight(tag: TagOption, queryText: string) {
 
   if (nameFound) {
     tag.name_parsed = highlightChars(tag.name, queryText, isDefault)
-    tag.synonyms_parsed = tag.synonyms
+    tag.synonyms_parsed = escapeHtml(tag.synonyms)
     return
   }
 
   if (!tag.synonyms) {
-    tag.name_parsed = tag.name
-    tag.synonyms_parsed = tag.synonyms
+    tag.name_parsed = escapeHtml(tag.name)
+    tag.synonyms_parsed = escapeHtml(tag.synonyms)
     return
   }
 
@@ -609,9 +610,9 @@ function applyHighlight(tag: TagOption, queryText: string) {
     const match = isDefault
       ? synonym.toLowerCase().includes(query)
       : foundByChars(synonym, query)
-    synonymsParsed.push(match ? highlightChars(synonym, queryText, isDefault) : synonym)
+    synonymsParsed.push(match ? highlightChars(synonym, queryText, isDefault) : escapeHtml(synonym))
   }
-  tag.name_parsed = tag.name
+  tag.name_parsed = escapeHtml(tag.name)
   tag.synonyms_parsed = synonymsParsed.join(', ')
 }
 

@@ -157,7 +157,7 @@
         <div
           v-if="meta?.synonyms && item.synonyms"
           class="px-1 synonyms text-medium-emphasis"
-          v-html="item.synonyms"
+          v-text="item.synonyms"
         />
 
         <ItemPinnedMeta

@@ -30,19 +30,19 @@
           v-if="mark.type == 'meta'"
           class="mark-item__name"
           v-tooltip="playerTooltip(markLabel)"
-          v-html="mark['tag.name'] || mark.tag?.name"
+          v-text="mark['tag.name'] || mark.tag?.name"
         />
         <span
           v-else-if="mark.text"
           class="mark-item__name"
           v-tooltip="playerTooltip(markLabel)"
-          v-html="mark.text"
+          v-text="mark.text"
         />
         <span
           v-else
           class="mark-item__name"
           v-tooltip="playerTooltip(markLabel)"
-          v-html="mark.name"
+          v-text="mark.name"
         />
       </div>
       <div class="mark-item__meta">

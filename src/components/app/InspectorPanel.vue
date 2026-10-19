@@ -317,7 +317,7 @@
               <div
                 v-if="tagSynonyms"
                 class="inspector-panel__synonyms text-medium-emphasis"
-                v-html="tagSynonyms"
+                v-text="tagSynonyms"
               />
 
               <div

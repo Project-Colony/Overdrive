@@ -41,5 +41,6 @@ describe('changelogNotesToPlainPreview', () => {
     expect(changelogNotesToPlainPreview('<p>Hello — world</p>')).toBe('Hello')
     expect(changelogNotesToPlainPreview('## Added\n- First item')).toBe('First item')
     expect(changelogNotesToPlainPreview('')).toBe('')
+    expect(changelogNotesToPlainPreview('<p>Use &amp;lt;b&amp;gt; &amp; more</p>')).toBe('Use &lt;b&gt; & more')
   })
 })
