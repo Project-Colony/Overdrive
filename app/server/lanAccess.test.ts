@@ -41,7 +41,7 @@ describe('applyLanAccessChange', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     registerServerNetworkDeps({
-      config: {allowLanAccess: '1'} as never,
+      config: {allowLanAccess: '0'} as never,
       configPath: '/tmp/config.json',
       getBestLocalIp: () => '127.0.0.1',
       getAllIps: () => [],
@@ -49,9 +49,9 @@ describe('applyLanAccessChange', () => {
     })
   })
 
-  it('does not restart the HTTP listener when LAN is already enabled', async () => {
-    // initLanAccess defaults lanEnabled to true before deps are registered.
-    await applyLanAccessChange(true)
+  it('does not restart the HTTP listener when LAN is already disabled', async () => {
+    // lanEnabled defaults to false (localhost only) before initLanAccess runs.
+    await applyLanAccessChange(false)
     expect(restartListener).not.toHaveBeenCalled()
     expect(saveConfigFile).toHaveBeenCalled()
   })

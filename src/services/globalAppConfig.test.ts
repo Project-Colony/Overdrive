@@ -45,8 +45,8 @@ describe('globalAppConfig', () => {
 
   it('reads global defaults when config fields are missing', () => {
     expect(readGlobalAppConfigFromStore({})).toEqual({
-      allowLanAccess: '1',
-      checkForUpdatesAtStartup: '1',
+      allowLanAccess: '0',
+      checkForUpdatesAtStartup: '0',
       selectedDisk: '',
       tpdbApiKey: '',
       transcodeUnsupportedFormats: '1',

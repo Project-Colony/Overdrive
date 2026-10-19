@@ -21,7 +21,7 @@ interface ServerNetworkDeps {
   restartListener: () => Promise<void>
 }
 
-let lanEnabled = true
+let lanEnabled = false
 let envLocked = false
 let serverDeps: ServerNetworkDeps | null = null
 
@@ -67,14 +67,14 @@ async function initLanAccess(db: ApiDb, _helpers: NetworkHelpers, config?: Serve
   envLocked = false
 
   if (config && typeof config.allowLanAccess === 'string' && config.allowLanAccess !== '') {
-    lanEnabled = parseBooleanSetting(config.allowLanAccess, true)
+    lanEnabled = parseBooleanSetting(config.allowLanAccess, false)
     return lanEnabled
   }
 
   const settingsRepo = createSettingsRepository(db.drizzle)
-  const {row: setting} = settingsRepo.findOrCreateByOption('allowLanAccess', '1')
+  const {row: setting} = settingsRepo.findOrCreateByOption('allowLanAccess', '0')
 
-  lanEnabled = parseBooleanSetting(setting.value, true)
+  lanEnabled = parseBooleanSetting(setting.value, false)
 
   if (config) {
     config.allowLanAccess = lanEnabled ? '1' : '0'

@@ -18,8 +18,8 @@ export const GLOBAL_APP_CONFIG_KEYS = [
 export type GlobalAppConfigKey = typeof GLOBAL_APP_CONFIG_KEYS[number]
 
 export const DEFAULT_GLOBAL_APP_CONFIG: Record<GlobalAppConfigKey, string> = {
-  allowLanAccess: '1',
-  checkForUpdatesAtStartup: '1',
+  allowLanAccess: '0',
+  checkForUpdatesAtStartup: '0',
   selectedDisk: '',
   tpdbApiKey: '',
   transcodeUnsupportedFormats: '1',

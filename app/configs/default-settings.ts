@@ -1,6 +1,6 @@
 const Settings = [  {
     "option": "allowLanAccess",
-    "value": 1
+    "value": 0
   },
   {
     "option": "passwordProtection",
@@ -140,7 +140,7 @@ const Settings = [  {
   },
   {
     "option": "checkForUpdatesAtStartup",
-    "value": 1
+    "value": 0
   },
   {
     "option": "startupHealthNotifications",

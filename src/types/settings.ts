@@ -282,7 +282,7 @@ export type SettingsState = {
 }
 
 export const defaultSettingsState = (): SettingsState => ({
-  allowLanAccess: '1',
+  allowLanAccess: '0',
   passwordProtection: '0',
   phrase: '',
   passwordHint: '',
@@ -324,7 +324,7 @@ export const defaultSettingsState = (): SettingsState => ({
   watchFolders: '0',
   selectedDisk: '',
   zoom: '1',
-  checkForUpdatesAtStartup: '1',
+  checkForUpdatesAtStartup: '0',
   startupHealthNotifications: '1',
   showIconsOfMetaInEditingDialog: '1',
   editingOverviewExpanded: '0',
