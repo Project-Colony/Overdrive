@@ -198,6 +198,9 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => {
   base: './',
   test: {
     environment: 'jsdom',
+    // Node 25+ exposes its own `localStorage` global (undefined without
+    // --localstorage-file), which shadows the jsdom one.
+    execArgv: ['--no-experimental-webstorage'],
     include: [
       'src/**/*.test.{js,ts}',
       'shared/**/*.test.ts',
