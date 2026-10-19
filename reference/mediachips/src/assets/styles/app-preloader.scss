@@ -1,0 +1,298 @@
+@use "@/assets/styles/app.scss";
+
+html,
+body {
+  overflow: hidden;
+  height: 100%;
+  background-color: rgb(var(--v-theme-background));
+}
+
+.app-startup-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background:
+    radial-gradient(ellipse 70% 55% at 28% 18%, rgba(122, 110, 240, 0.14), transparent 60%),
+    radial-gradient(ellipse 55% 45% at 78% 78%, rgba(240, 161, 26, 0.1), transparent 55%),
+    linear-gradient(160deg, #f7f6fb 0%, #f3f1f8 48%, #faf9fc 100%);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.app-startup-splash__glow {
+  position: absolute;
+  width: min(70vw, 420px);
+  height: min(70vw, 420px);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(155, 147, 232, 0.16), transparent 68%);
+  filter: blur(8px);
+  animation: app-startup-glow 3.2s ease-in-out infinite;
+}
+
+.app-startup-splash__logo {
+  position: relative;
+  width: min(34vw, 168px);
+  height: auto;
+  border-radius: 28px;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 8px 18px rgba(80, 70, 140, 0.12));
+  animation: app-startup-pulse 2.4s ease-in-out infinite;
+}
+
+.app-startup-splash__name {
+  position: relative;
+  margin-top: 6px;
+  font-family: Helvetica, Roboto, sans-serif;
+  font-size: clamp(1.35rem, 3.4vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #2c2940;
+  animation: app-startup-fade 0.7s ease both;
+}
+
+.app-startup-splash__tagline {
+  position: relative;
+  font-family: Helvetica, Roboto, sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(44, 41, 64, 0.5);
+  animation: app-startup-fade 0.9s ease 0.08s both;
+}
+
+.app-content-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 96px);
+  min-height: calc(100dvh - 96px);
+}
+
+@keyframes app-startup-pulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-4px) scale(1.04);
+  }
+}
+
+@keyframes app-startup-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes app-startup-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.player-window-app {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+
+  .v-application__wrap {
+    min-height: 100%;
+    height: 100%;
+  }
+}
+
+.reduced-top {
+  /* Offset for fixed app bar; scroll lives in the remaining v-main area. */
+  padding-top: var(--app-content-offset-top, 48px) !important;
+  box-sizing: border-box;
+}
+
+.app-main-layout {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden !important;
+  --app-content-offset-top: 48px;
+  --app-content-offset-bottom: 0px;
+  --app-bottom-bar-height: 56px;
+
+  &.added-top-tabs {
+    --app-content-offset-top: calc(48px + 28px);
+  }
+
+  &.windows-os-added-top {
+    --app-content-offset-top: calc(48px + 32px);
+
+    &.added-top-tabs {
+      --app-content-offset-top: calc(48px + 32px + 28px);
+    }
+  }
+
+  &.has-bottom-bar {
+    --app-content-offset-bottom: calc(var(--app-bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.main-drop-target {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1008;
+  overflow: hidden;
+
+  .dropzone {
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s ease, visibility 0.12s ease;
+
+    &--active {
+      pointer-events: all;
+      opacity: 1;
+      visibility: visible;
+      cursor: pointer;
+    }
+  }
+}
+
+.main-scroll {
+  position: relative;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.main-scroll:has(.session-focus-bar) .items-control-deck--browser {
+  --deck-sticky-top: 48px;
+}
+
+/* Browser layout: keep cards/sidebar/inspector from highlighting text while navigating. */
+.app-main-layout.has-browser-layout {
+  .main-scroll,
+  .main-scroll-inner,
+  .items-page-grid,
+  .items-masonry-grid,
+  .item {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .main-scroll input,
+  .main-scroll textarea,
+  .main-scroll [contenteditable="true"],
+  .main-scroll .selectable,
+  .main-scroll .v-field__input {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+.sidebar-browser,
+.inspector-panel {
+  -webkit-user-select: none;
+  user-select: none;
+
+  input,
+  textarea,
+  [contenteditable="true"],
+  .selectable,
+  .v-field__input {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* Bottom bar height already includes safe-area-inset-bottom via Vuetify layout. */
+.app-main-layout.has-bottom-bar .main-scroll-inner {
+  padding-bottom: 0;
+}
+
+.main-scroll--settings {
+  overflow: hidden;
+}
+
+.main-scroll-inner--settings {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+
+  > * {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 959px) {
+  .main-scroll--settings {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .main-scroll-inner--settings {
+    height: auto;
+    min-height: 100%;
+    display: block;
+
+    > * {
+      min-height: auto;
+    }
+  }
+
+  .app-main-layout.has-bottom-bar .main-scroll-inner--settings {
+    padding-bottom: var(--app-content-offset-bottom);
+  }
+}
+
+// Windows Electron header chrome (no glass blur — content no longer scrolls under the bar)
+.electron-win {
+  .system-bar-custom.v-system-bar {
+    box-shadow: none !important;
+    border-bottom: none !important;
+    overflow: visible;
+    z-index: 1010 !important;
+  }
+
+  .v-app-bar.os-windows-electron {
+    border-top: none !important;
+
+    .v-toolbar__underlay {
+      opacity: 0;
+    }
+
+    .v-toolbar__content .v-btn {
+      &:not(.v-btn--variant-flat) {
+        .v-btn__overlay,
+        .v-btn__underlay {
+          opacity: 0;
+        }
+
+        &:hover .v-btn__overlay {
+          opacity: var(--v-hover-opacity);
+        }
+      }
+    }
+  }
+}

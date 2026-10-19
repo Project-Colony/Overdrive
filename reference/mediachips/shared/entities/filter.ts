@@ -1,0 +1,53 @@
+export interface FilterObject {
+  id: number | null
+  param: string | number | null
+  type: string | null
+  cond: string | null
+  val: unknown
+  note: string | null
+  active: boolean
+  lock: boolean
+  removed?: boolean
+  metaId?: number
+  order?: number | null
+  /** UI-only stable key for drag-and-drop before the row has a DB id. */
+  clientKey?: string
+  /** Ignored leftover from tag trees. Saved filters may still contain it. */
+  includeDescendants?: boolean
+}
+
+export interface FilterListParam {
+  param: string | number
+  type?: string
+  icon?: string
+  text?: string
+  textKey?: string
+  group?: string
+}
+
+export interface FilterCondition {
+  cond: string
+  icon: string
+  text: string
+}
+
+export interface SavedFilter {
+  id?: number
+  name?: string
+  filters?: FilterObject[]
+  savedAt?: string
+  sortBy?: string | null
+  sortDir?: string | null
+  size?: number | null
+  view?: number | string | null
+  groupBy?: string | null
+  filtersJoin?: 'and' | 'or' | null
+  icon?: string | null
+  [key: string]: unknown
+}
+
+export interface SavedFilterBasic {
+  id: number
+  name?: string | null
+  [key: string]: unknown
+}

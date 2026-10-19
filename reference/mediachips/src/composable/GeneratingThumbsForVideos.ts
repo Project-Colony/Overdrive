@@ -1,0 +1,253 @@
+import {ref, watch, onBeforeUnmount} from 'vue'
+import path from 'path-browserify'
+import {useI18n} from 'vue-i18n'
+import {useTasksStore} from '@/stores/tasks'
+import {useItemsStore} from '@/stores/items'
+import {useSettingsStore} from '@/stores/settings'
+import {useAppStore} from '@/stores/app'
+import {useEventBus} from '@/utils/eventBus'
+import {useItemsListSync} from '@/composable/itemsListSync'
+import {typedApi} from '@/services/typedApi'
+import {visibleItemIds} from '@/utils/visibleItemsWindow'
+import {buildVideoGridTaskParams} from '@shared/videoPreview'
+import type { MediaItem } from '@/types/stores'
+
+const GENERATION_WINDOW_LIMIT = 24
+
+interface GeneratorState {
+  active: boolean
+  stopped: boolean
+}
+
+function isGridAlreadyExistsError(error: unknown): boolean {
+  const err = error as {response?: {data?: {message?: string}}; message?: string} | null
+  const message = String(err?.response?.data?.message || err?.message || error || '')
+  return /already exists/i.test(message)
+}
+
+function gridFilePath(mediaPath: string, mediaId: number): string {
+  return path.join(mediaPath, 'videos', 'grids', `${mediaId}.jpg`)
+}
+
+export default function useVideoImageGenerator() {
+  const {t} = useI18n()
+  const tasksStore = useTasksStore()
+  const itemsStore = useItemsStore()
+  const settingsStore = useSettingsStore()
+  const appStore = useAppStore()
+  const eventBus = useEventBus()
+  const listSync = useItemsListSync()
+
+  const grid = ref<GeneratorState>({
+    active: false,
+    stopped: false,
+  })
+
+  const timeout = ref<ReturnType<typeof setTimeout> | null>(null)
+  const processedGridVideoIds = ref(new Set<number>())
+  const lastItemsCount = ref(0)
+
+  const createVideoGrid = (input: string, output: string): Promise<unknown> => {
+    return new Promise((resolve, reject) => {
+      typedApi.taskCreateGrid(buildVideoGridTaskParams(input, output))
+        .then((res) => {
+          resolve(res)
+        })
+        .catch((e) => {
+          reject(e)
+        })
+    })
+  }
+
+  const filterVideosMissingGrids = async (videos: MediaItem[]): Promise<MediaItem[]> => {
+    const mediaPath = appStore.mediaPath
+    if (!mediaPath || !videos.length) return videos
+
+    const paths = videos.map((video) => gridFilePath(mediaPath, Number(video.id)))
+    try {
+      const response = await typedApi.checkFilesExist(paths)
+      const results = response.data?.results || {}
+      return videos.filter((video, index) => results[paths[index]] !== true)
+    } catch {
+      // If the existence check fails, fall back to createGrid (server skips existing).
+      return videos
+    }
+  }
+
+  const createGrids = async (videos: MediaItem[]): Promise<void> => {
+    if (grid.value.active) return
+
+    const missing = await filterVideosMissingGrids(videos)
+    if (!missing.length) return
+
+    grid.value.active = true
+    grid.value.stopped = false
+
+    const taskId = tasksStore.setTask({
+      key: 'generating_grid_images',
+      title: t('tasks_text.generating_grid_images'),
+      icon: 'apps',
+      action: () => {
+        grid.value.stopped = true
+      },
+    })
+
+    try {
+      let completed = 0
+      for (const video of missing) {
+        if (grid.value.stopped) break
+
+        completed++
+        tasksStore.updateTask(taskId, {
+          subtitle: t('tasks_text.of_total', {completed, total: missing.length}),
+          progress: (completed / missing.length) * 100,
+        })
+
+        try {
+          if (video.path) {
+            await createVideoGrid(video.path, `${video.id}.jpg`)
+          }
+
+          itemsStore.refreshThumb(video.id, {broadcast: false})
+          eventBus.emit('updateVideoFrames', video.id)
+          listSync.getItemsFromDb({
+            ids: [video.id],
+            type: 'media',
+          })
+        } catch (error) {
+          if (isGridAlreadyExistsError(error)) {
+            continue
+          }
+          console.error(`Failed to create grid for video ${video.id}:`, error)
+        }
+      }
+    } catch (error) {
+      console.error('Error in createGrids:', error)
+    } finally {
+      grid.value.active = false
+      tasksStore.removeTask(taskId)
+    }
+  }
+
+  const getVideosToProcess = (videos: MediaItem[]): MediaItem[] => {
+    if (!Array.isArray(videos) || !videos.length) return []
+
+    return videos.filter((video) => video?.id && !processedGridVideoIds.value.has(video.id))
+  }
+
+  const markVideosProcessed = (videos: MediaItem[]): void => {
+    for (const video of videos) {
+      if (video?.id) processedGridVideoIds.value.add(video.id)
+    }
+  }
+
+  const pruneProcessedToWindow = (videos: MediaItem[]): void => {
+    const keep = new Set(
+      videos.map((video) => Number(video?.id)).filter((id) => Number.isFinite(id)),
+    )
+    if (!keep.size) {
+      processedGridVideoIds.value = new Set()
+      return
+    }
+    const next = new Set<number>()
+    for (const id of processedGridVideoIds.value) {
+      if (keep.has(id)) next.add(id)
+    }
+    processedGridVideoIds.value = next
+  }
+
+  const resetProcessedVideos = (): void => {
+    processedGridVideoIds.value = new Set()
+  }
+
+  const resolveVideosForGeneration = (videos: MediaItem[]): MediaItem[] => {
+    if (!Array.isArray(videos) || !videos.length) return []
+
+    const visible = visibleItemIds.value
+    if (visible.length) {
+      const visibleSet = new Set(visible.map((id) => Number(id)))
+      return videos.filter((video) => visibleSet.has(Number(video.id)))
+    }
+
+    return videos.slice(0, GENERATION_WINDOW_LIMIT)
+  }
+
+  const shouldGenerateGrid = () => !grid.value.active && (
+    settingsStore.videoPreviewStatic === 'grid' ||
+    settingsStore.videoPreviewHover === 'timeline' ||
+    Number(itemsStore.view) === 2
+  )
+
+  const generateImages = (videos: MediaItem[]): void => {
+    if (!Array.isArray(videos)) return
+
+    if (videos.length === 0) {
+      resetProcessedVideos()
+      lastItemsCount.value = 0
+      return
+    }
+
+    if (videos.length < lastItemsCount.value) {
+      resetProcessedVideos()
+    }
+    lastItemsCount.value = videos.length
+    pruneProcessedToWindow(videos)
+
+    if (timeout.value) {
+      clearTimeout(timeout.value)
+      timeout.value = null
+    }
+
+    grid.value.stopped = false
+
+    timeout.value = setTimeout(() => {
+      if (!shouldGenerateGrid()) return
+
+      const gridVideos = getVideosToProcess(videos)
+      if (!gridVideos.length) return
+
+      markVideosProcessed(gridVideos)
+      void createGrids(gridVideos)
+    }, 3000)
+  }
+
+  const scheduleGenerationForCurrentPage = () => {
+    if (itemsStore.type === 'media') {
+      generateImages(resolveVideosForGeneration(itemsStore.itemsOnPage))
+    }
+  }
+
+  watch(
+    [() => itemsStore.itemsOnPage, visibleItemIds],
+    ([videos]) => {
+      if (itemsStore.type === 'media') {
+        generateImages(resolveVideosForGeneration(videos as MediaItem[]))
+      }
+    },
+  )
+
+  watch(() => Number(itemsStore.view), () => {
+    scheduleGenerationForCurrentPage()
+  })
+
+  watch(
+    () => [settingsStore.videoPreviewStatic, settingsStore.videoPreviewHover],
+    () => {
+      scheduleGenerationForCurrentPage()
+    },
+  )
+
+  const cleanup = (): void => {
+    if (timeout.value) clearTimeout(timeout.value)
+    grid.value.stopped = true
+  }
+
+  onBeforeUnmount(cleanup)
+
+  return {
+    grid,
+    generateImages,
+    createGrids,
+    cleanup,
+  }
+}

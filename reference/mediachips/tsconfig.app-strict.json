@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "tsBuildInfoFile": ".cache/tsc/app-strict.tsbuildinfo",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    }
+  },
+  "include": ["app/**/*.ts", "shared/**/*.ts", "api/types/**/*.d.ts"]
+}

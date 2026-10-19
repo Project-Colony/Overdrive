@@ -1,0 +1,4055 @@
+.item {
+  position: relative;
+  --item-rating-icon: 20px;
+  --item-fav-icon: 22px;
+  --item-rating-star-gap: 1px;
+  --item-fav-inset-top: 6px;
+  --item-fav-inset-right: 6px;
+
+  .item-title {
+    font-size: 1.05em;
+  }
+
+  // Keep native card drag-out; don't let preview <img> steal HTML5 drag.
+  img,
+  picture,
+  video {
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+
+  &--selecting {
+    overflow: hidden;
+  }
+
+  &--selecting:not(.item-view-5) {
+    border-radius: 17px;
+  }
+
+  &--inspector-focused,
+  &--keyboard-cursor {
+    outline: 2px solid rgb(var(--v-theme-primary));
+    outline-offset: 2px;
+    border-radius: 17px;
+    z-index: 1;
+  }
+
+  &--tag-drop-target {
+    outline: 2px dashed rgb(var(--v-theme-primary));
+    outline-offset: 2px;
+    border-radius: 17px;
+    z-index: 2;
+
+    .item_wrapper {
+      box-shadow: inset 0 0 0 2px rgba(var(--v-theme-primary), 0.35);
+    }
+  }
+
+  .item-select-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    cursor: pointer;
+    border-radius: 17px;
+    pointer-events: auto;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: #000;
+      opacity: 0.32;
+      pointer-events: none;
+    }
+
+    &--selected {
+      /* 1px inset border — outline is clipped by `.item--selecting { overflow: hidden }`. */
+      box-shadow: inset 0 0 0 1px rgb(var(--v-theme-primary));
+    }
+
+    &--selected::before {
+      background: rgb(var(--v-theme-primary));
+      opacity: 0.28;
+    }
+  }
+
+  .item-select-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.72);
+      transform: scale(1.04);
+    }
+
+    &--on {
+      color: #fff;
+      border-color: rgb(var(--v-theme-primary));
+      background: rgb(var(--v-theme-primary));
+    }
+  }
+
+  &.item--context-target {
+    /* Above sibling cards/overlays, but below sticky items-control-deck. */
+    z-index: 5;
+  }
+
+  & > .v-card {
+    z-index: initial;
+  }
+  &.big-preview {
+    z-index: 1010;
+  }
+  &_wrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  &:hover {
+    .rating,
+    .bookmark {
+      opacity: 0.9;
+      &:hover {
+        opacity: 1;
+      }
+    }
+    .custom2-img-button,
+    .custom1-img-button {
+      opacity: 0.7;
+      transform: translateX(0);
+      &:hover {
+        opacity: 1;
+      }
+    }
+    .item-menu-btn {
+      opacity: 1;
+    }
+  }
+  &.favorite {
+    &::after {
+      content: "";
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      left: 0;
+      top: 0;
+      border-radius: 16px;
+      pointer-events: none;
+      box-shadow: 0px 2px 8px 3px rgba(255, 0, 75, 0.25), 0 0 0 1px #ff004b;
+    }
+    .main-img:before {
+      opacity: 1;
+    }
+    .video-preview-container,
+    .item_preview {
+      &:before {
+        opacity: 1;
+      }
+    }
+    &.icons-in-card {
+      .video-preview-container,
+      .item_preview {
+        &:before {
+          display: none;
+        }
+      }
+    }
+    &.item-tag.item-view-2:after {
+      display: none;
+    }
+  }
+  &-title {
+    line-height: 0.8;
+    padding: 0.6em 4px 0.4em;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1.1em;
+  }
+  .main-img {
+    &.static {
+      .v-image__image,
+      .v-img__img {
+        transform: none !important;
+      }
+    }
+  }
+  .main-img,
+  .thumb {
+    cursor: pointer;
+    .v-image__image,
+    .v-img__img {
+      transition: transform 0.3s ease;
+    }
+    &:hover {
+      .v-image__image,
+      .v-img__img {
+        transform: scale(1.1);
+      }
+    }
+  }
+  .video-preview-container.is-video-preview-enabled .thumb {
+    .v-image__image,
+    .v-img__img {
+      transform: none !important;
+    }
+  }
+  &.item-tag.item-view-1,
+  &.item-tag.item-view-4 {
+    .main-img:not(.static) {
+      &:hover {
+        .v-image__image,
+        .v-img__img {
+          transform: scale(1.05);
+        }
+      }
+    }
+  }
+  .v-card {
+    border: none;
+    border-radius: 17px;
+    box-shadow: 0px 4px 13px 0px #0000002b;
+  }
+  .description {
+    height: 100%;
+    border-radius: 0 0 16px 16px;
+  }
+  .rating-favorite-in-description {
+    --item-rating-favorite-muted-color: #b5b5b5;
+    --item-rating-favorite-icon-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    position: relative;
+    margin-bottom: 2px;
+    margin-top: 2px;
+    pointer-events: none;
+
+    &__left,
+    &__right {
+      display: flex;
+      align-items: center;
+      pointer-events: auto;
+    }
+
+    &__left {
+      grid-column: 1;
+      justify-self: start;
+      justify-content: flex-start;
+      min-width: 0;
+    }
+
+    &__right {
+      grid-column: 2;
+      justify-self: end;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .fav-btn,
+    .rating {
+      position: relative;
+      opacity: 1;
+    }
+
+    .rating {
+      flex: 0 0 auto;
+      min-width: 0;
+      background-color: transparent;
+
+      .v-btn .v-icon {
+        text-shadow: var(--item-rating-favorite-icon-shadow);
+      }
+
+      .v-btn:not(.text-yellow-darken-2) .v-icon {
+        color: var(--item-rating-favorite-muted-color) !important;
+      }
+    }
+
+    .fav-btn {
+      flex: 0 0 auto;
+      margin: 0;
+      top: 0;
+      right: 0;
+
+      .v-selection-control:not(.v-selection-control--dirty) .v-icon {
+        color: var(--item-rating-favorite-muted-color) !important;
+        opacity: 1;
+      }
+
+      .v-icon {
+        text-shadow: var(--item-rating-favorite-icon-shadow);
+      }
+    }
+  }
+  // images
+  .item_preview {
+    position: relative;
+    overflow: hidden;
+    //border-radius: 4px 4px 0 0;
+    background-color: #7878782b;
+    flex: 1 0 auto;
+
+    &__placeholder {
+      width: 100%;
+      background-color: #7878782b;
+
+      &--video {
+        aspect-ratio: 16 / 9;
+      }
+
+      &--square {
+        aspect-ratio: 1 / 1;
+      }
+
+      &--masonry {
+        min-height: 180px;
+      }
+    }
+
+    &:hover {
+      .secondary-img {
+        opacity: 1;
+      }
+    }
+  }
+  .secondary-img {
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    transition: 0.3s all ease;
+    opacity: 0;
+    .v-image__image {
+      background-position-y: top !important;
+      background-color: rgba(134, 134, 134, 0.1);
+    }
+  }
+  .custom2-img,
+  .custom1-img {
+    pointer-events: none;
+    position: absolute !important;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    opacity: 0;
+    min-width: 100%;
+    min-height: 100%;
+    transition: 0.3s opacity ease-out;
+    &-button {
+      width: 3em;
+      height: 3em;
+      background: rgba(10, 10, 10, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      position: absolute;
+      right: 0;
+      opacity: 0;
+      transition: 0.3s;
+      transform: translateX(50px);
+      z-index: 1;
+    }
+  }
+  .custom1-img {
+    &-button {
+      bottom: 50%;
+    }
+  }
+  .custom2-img {
+    &-button {
+      bottom: calc(50% - 3em);
+    }
+  }
+  .custom1-img-button {
+    &:hover {
+      & + .custom1-img {
+        opacity: 1 !important;
+      }
+    }
+  }
+  .custom2-img-button {
+    &:hover {
+      & + .custom2-img {
+        opacity: 1 !important;
+      }
+    }
+  }
+  // end images
+  .country {
+    position: absolute;
+    top: 0.3em;
+    left: 0.3em;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .flag-icon {
+    width: 28px;
+    height: 20px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    .flag {
+      position: absolute;
+      margin: auto;
+      left: -100%;
+      right: -100%;
+      top: -100%;
+      bottom: -100%;
+      border-radius: 10px;
+    }
+  }
+  //&-color.v-icon {
+  //  position: absolute;
+  //  left: 0.2em;
+  //  top: 0.2em;
+  //  z-index: 1;
+  //  text-shadow: 0 0 3px #00000070;
+  //  //&:before {
+  //  //  font-size: 1em;
+  //  //}
+  //  & + .country {
+  //    top: 2em;
+  //  }
+  //}
+  .fav-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    box-sizing: content-box;
+    width: var(--item-fav-icon);
+    height: var(--item-fav-icon);
+    min-width: var(--item-fav-icon);
+    max-width: var(--item-fav-icon);
+    margin: 0 !important;
+    padding: var(--item-fav-inset-top) var(--item-fav-inset-right) 0 0 !important;
+    opacity: 0.7;
+    z-index: 5;
+    transform: none;
+
+    .v-input__control {
+      width: var(--item-fav-icon);
+      height: var(--item-fav-icon);
+    }
+
+    .v-selection-control {
+      min-height: var(--item-fav-icon) !important;
+      height: var(--item-fav-icon);
+      width: var(--item-fav-icon);
+      margin: 0;
+      padding: 0;
+    }
+
+    .v-selection-control__wrapper,
+    .v-selection-control__input {
+      width: var(--item-fav-icon) !important;
+      height: var(--item-fav-icon) !important;
+      min-width: var(--item-fav-icon) !important;
+      min-height: var(--item-fav-icon) !important;
+    }
+
+    .v-icon {
+      font-size: var(--item-fav-icon) !important;
+      width: var(--item-fav-icon) !important;
+      height: var(--item-fav-icon) !important;
+    }
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  .rating-favorite-in-description .fav-btn,
+  .masonry-meta-overlay__rating .fav-btn {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    max-width: none;
+    padding: 0 !important;
+  }
+
+  .rating.v-rating {
+    gap: var(--item-rating-star-gap);
+    max-width: 100%;
+
+    .v-btn {
+      width: var(--item-rating-icon) !important;
+      height: var(--item-rating-icon) !important;
+      min-width: var(--item-rating-icon) !important;
+      padding: 0 !important;
+      --v-btn-size: var(--item-rating-icon);
+    }
+
+    .v-btn .v-icon {
+      font-size: var(--item-rating-icon) !important;
+      width: var(--item-rating-icon) !important;
+      height: var(--item-rating-icon) !important;
+    }
+  }
+
+  .item_preview > .rating,
+  .item_preview > .fav-btn {
+    // Above nested .thumb (z-index: 2) which otherwise paints over these overlays.
+    z-index: 5;
+    transition: opacity 0.2s ease;
+
+    .v-icon {
+      text-shadow: 0px 1px 3px #444444c5;
+    }
+  }
+
+  .item_preview > .fav-btn {
+    text-shadow: 0px 1px 3px #444444c5;
+
+    // Match empty rating stars (`color="#eee"`); keep pink when favorited.
+    .v-selection-control:not(.v-selection-control--dirty) .v-icon {
+      color: #eee !important;
+      opacity: 1;
+    }
+  }
+
+  // Keep rating/favorite on the static poster; hide while hover video preview plays.
+  .item_preview:has(.video-preview-container.is-hovered) > .rating,
+  .item_preview:has(.video-preview-container.is-hovered) > .fav-btn,
+  .item_preview:has(.video-preview-container.is-preview-active) > .rating,
+  .item_preview:has(.video-preview-container.is-preview-active) > .fav-btn,
+  &.big-preview .item_preview > .rating,
+  &.big-preview .item_preview > .fav-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rating {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    opacity: 0.7;
+    z-index: 1;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-top-right-radius: 3px;
+    line-height: 1;
+    transition: 0.2s all;
+  }
+
+  .rating-favorite-in-description .rating,
+  .masonry-meta-overlay__rating .rating {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    background-color: transparent;
+  }
+  .bookmark {
+    position: absolute;
+    top: -0.25em;
+    right: 20%;
+    opacity: 0.8;
+    font-size: 3em;
+    text-shadow: 0px 0px 3px #00000070;
+  }
+  .description {
+    padding: 0.4em;
+  }
+  .name {
+    line-height: 1.4 !important;
+    font-size: 1.2em;
+    margin-top: 0.2em;
+    margin-bottom: 0.2em;
+  }
+  .synonyms {
+    line-height: 1.4 !important;
+    font-size: 0.9em;
+    padding: 0 4px;
+  }
+  .v-slide-group__content {
+    padding: 0 !important;
+  }
+  &.item__size {
+    &-1 {
+      .story {
+        height: 100px;
+      }
+    }
+    &-2 {
+      .story {
+        height: 140px;
+      }
+    }
+    &-4 {
+      .story {
+        height: 220px;
+      }
+    }
+    &-5 {
+      .story {
+        height: 260px;
+      }
+    }
+    &-6 {
+      .story {
+        height: 300px;
+      }
+    }
+  }
+
+  .reg-block {
+    position: absolute;
+    z-index: 3;
+    background-color: hsla(0, 0%, 0%, 0.7);
+    text-transform: uppercase;
+    text-align: center;
+    padding: 5px;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    justify-content: center;
+    color: #fff;
+    cursor: default;
+  }
+}
+
+.item-menu-btn {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  opacity: 0;
+  z-index: 3;
+}
+
+.nested-tags {
+  .category {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 0.4em;
+    padding: 0 4px;
+    width: 100%;
+    //background-color: #7878782b;
+  }
+  .category-name {
+    display: flex;
+    align-items: center;
+    margin-right: 0.5em;
+    font-size: 0.9em;
+    .v-icon {
+      margin-right: 0;
+    }
+  }
+  .v-icon {
+    margin-right: 0.2em;
+    font-size: 1.2em;
+  }
+  .category-name .v-icon {
+    margin-right: 0;
+  }
+  .nested-tags__toggle {
+    cursor: pointer;
+    margin: 0.15em 0.1em !important;
+  }
+}
+
+.item .nested-tags {
+  .v-chip {
+    margin: 0.15em 0.1em !important;
+    padding: 0 !important;
+    line-height: 1.3;
+    font-size: 0.9em !important;
+    min-height: 20px !important;
+    height: auto !important;
+
+    .v-chip__content {
+      padding-inline: 6px !important;
+    }
+
+    &:has(.v-chip__prepend) {
+      .v-chip__prepend {
+        margin-left: 10px !important;
+        margin-right: 2px !important;
+      }
+
+      .v-chip__content {
+        padding-left: 0 !important;
+        padding-right: 6px !important;
+      }
+    }
+  }
+}
+
+// VIDEOS
+.item-media {
+  .duration {
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    padding: 2px;
+    line-height: 1;
+    font-weight: 300;
+    font-size: 0.8em;
+    border-radius: 3px;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.5);
+    user-select: none;
+  }
+  .resolution {
+    position: absolute;
+    left: 1px;
+    top: 1px;
+    font-weight: 300;
+    color: #fff !important;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 14px 3px 3px;
+    overflow: hidden;
+    opacity: 0.7;
+    line-height: 1;
+    .text {
+      font-size: 0.55em;
+      font-weight: 600;
+      width: 100%;
+      background-color: rgb(236, 197, 22);
+      color: #000;
+      padding: 0 0.5em;
+      &.sd {
+        background-color: #db8e6b;
+      }
+      &.hd {
+        background-color: #e2e2e2;
+      }
+      &.fhd {
+        background-color: #ffee00;
+      }
+      &.uhd {
+        background-color: #00ffff;
+      }
+      &.vert {
+        background-color: #e674b6;
+      }
+    }
+    .value {
+      font-size: 0.6em;
+      width: 100%;
+      background-color: #000;
+      color: #ffffff;
+      padding: 0.1em 0.5em;
+    }
+  }
+  .theme--light.v-text-field > .v-input__control > .v-input__slot:before {
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+  .theme--dark.v-text-field > .v-input__control > .v-input__slot:before {
+    border-color: rgba(255, 255, 255, 0.05);
+  }
+  .timeline {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    // Same oversample as `.thumb { inset: -1px }` so the sprite tile covers the poster.
+    position: absolute;
+    inset: -1px;
+    width: auto;
+    height: auto;
+    background-color: #000;
+    animation: appearing 0.3s both;
+    .grid-sprite-frame {
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+    }
+    .grid-sprite-sheet {
+      position: absolute;
+      pointer-events: none;
+    }
+    img {
+      height: 100%;
+    }
+    &.no-frame {
+      background-color: #111;
+      img {
+        display: none;
+      }
+      .text-gen {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+      }
+    }
+    .sections {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      display: flex;
+    }
+    .section {
+      height: 100%;
+      width: 100%;
+      position: relative;
+      &:before {
+        content: "";
+        position: absolute;
+        height: 5px;
+        left: 1px;
+        right: 1px;
+        bottom: 1px;
+        border-radius: 1px;
+        background-color: white;
+        box-shadow: 0 0 3px #333;
+        opacity: 0.5;
+        transition: 0.3s all;
+      }
+      &:hover {
+        &:before {
+          opacity: 1;
+          height: 8px;
+        }
+      }
+    }
+  }
+  .story {
+    display: flex;
+    height: 180px;
+    width: 100%;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    background-color: #83838338;
+    cursor: pointer;
+    .message {
+      position: absolute;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      top: 20%;
+      z-index: 2;
+      pointer-events: none;
+      .v-sheet {
+        padding: 2px 5px;
+        border-radius: 5px;
+      }
+    }
+    .wrapper {
+      pointer-events: none;
+      display: flex;
+      flex-wrap: nowrap;
+      position: absolute;
+      top: 0;
+      left: 0;
+      min-width: 100%;
+      height: 100%;
+      img {
+        height: 100%;
+        pointer-events: none;
+      }
+    }
+    .frame {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: 100%;
+      .grid-sprite-frame {
+        flex-shrink: 0;
+      }
+    }
+    &:hover {
+      .error,
+      .resolution,
+      .item-title {
+        opacity: 0.3;
+      }
+    }
+    .story-header {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      right: auto;
+      max-width: calc(100% - 6px);
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+      min-width: 0;
+      .resolution {
+        position: static;
+        flex: 0 0 auto;
+        border-radius: 0;
+      }
+      .story-title {
+        flex: 0 1 auto;
+        width: max-content;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 2px 8px;
+        line-height: 1.2;
+        border-radius: 5px;
+        background: #00000075;
+        color: #fff;
+        opacity: 1;
+        transition: opacity 0.2s ease;
+      }
+    }
+    &:hover .story-header .story-title {
+      opacity: 0.08;
+    }
+  }
+  &.item-view-2 {
+    &:hover {
+      .item-title {
+        opacity: 0.3;
+      }
+    }
+  }
+  .duration,
+  .resolution {
+    pointer-events: none;
+  }
+  .no-file {
+    .thumb,
+    img {
+      filter: saturate(0.1) opacity(50%);
+    }
+  }
+  .v-progress-linear {
+    flex: 1 0 auto;
+    margin-top: -1px;
+    position: relative;
+    z-index: 1;
+
+    .v-progress-linear__background {
+      opacity: 1 !important;
+      // Plain rgba — Sass breaks rgba(var(--v-theme-*), …)
+      background: rgba(0, 0, 0, 0.2) !important;
+    }
+  }
+}
+
+.v-theme--dark .item .v-progress-linear .v-progress-linear__background {
+  background: rgba(255, 255, 255, 0.24) !important;
+}
+
+.error-load-thumb {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  height: 100%;
+  color: #fff;
+  pointer-events: none;
+  user-select: none;
+}
+
+.no-ripple {
+  display: none;
+}
+
+.video-preview-container {
+  background-color: #7878782b;
+  flex: 1 0 auto;
+
+  // Default gray underlay is fine at rest. Do not force black while the hover
+  // <video> is mounted — the static thumb stays underneath as the underlay so
+  // leave/enter fades never flash black or gray through a transparent thumb.
+  &:not(.video-preview-container--expanded) {
+    position: relative !important;
+    inset: unset !important;
+    width: auto !important;
+    height: auto !important;
+    transform: none !important;
+    z-index: auto !important;
+    transition: 0.2s all ease;
+  }
+
+  &.video-preview-container--expanded {
+    --big-preview-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --big-preview-thumb-filter: blur(56px) saturate(1.55) brightness(0.36);
+    // Reserve space for the glass HUD above/below the video plate.
+    --big-preview-safe-top: 48px;
+    --big-preview-safe-bottom: 48px;
+    --big-preview-chrome-gap: 8px;
+    --big-preview-pad-x: 16px;
+    --big-preview-video-max-height: calc(
+      100vh - var(--big-preview-safe-top) - var(--big-preview-safe-bottom) - (var(--big-preview-chrome-gap) * 2)
+    );
+    --big-preview-video-offset-y: calc(
+      (var(--big-preview-safe-top) - var(--big-preview-safe-bottom)) / 2
+    );
+    position: fixed;
+    isolation: isolate;
+    background-color: #000;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: none !important;
+
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 420ms var(--big-preview-ease);
+    }
+
+    &::before {
+      z-index: 1;
+      background:
+        radial-gradient(ellipse 68% 58% at 50% 48%, transparent 8%, rgba(0, 0, 0, 0.42) 100%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, transparent 22%, transparent 70%, rgba(0, 0, 0, 0.62) 100%);
+    }
+
+    &::after {
+      z-index: 1;
+      box-shadow: inset 0 0 140px 28px rgba(0, 0, 0, 0.42);
+    }
+
+    &:not(.video-preview-container--expanding):not(.video-preview-container--collapsing) {
+      &::before,
+      &::after {
+        opacity: 1;
+      }
+    }
+
+    video {
+      pointer-events: none;
+      opacity: 1 !important;
+      animation: none;
+    }
+    .duration,
+    .resolution {
+      display: none;
+    }
+    .thumb {
+      max-height: none;
+      width: 200%;
+      min-width: 200%;
+      height: 200%;
+      position: absolute;
+      left: -50%;
+      top: -50%;
+      z-index: 0;
+      opacity: 1;
+      filter: var(--big-preview-thumb-filter);
+      background-color: transparent;
+      will-change: filter, opacity;
+      transition:
+        width 350ms var(--big-preview-ease),
+        min-width 350ms var(--big-preview-ease),
+        height 350ms var(--big-preview-ease),
+        left 350ms var(--big-preview-ease),
+        top 350ms var(--big-preview-ease),
+        filter 350ms var(--big-preview-ease),
+        opacity 280ms ease-in-out;
+
+      // Cover the stage so card letterbox blacks don't read as bars
+      // behind the centered video plate.
+      .v-img__img {
+        object-fit: cover !important;
+        background-color: transparent !important;
+      }
+    }
+
+    &.video-preview-container--expanding {
+      .thumb {
+        // Blur in parallel with the FLIP expand (not after it).
+        filter: blur(0) saturate(1) brightness(1);
+        opacity: 0.96;
+        animation: video-big-preview-thumb-blur-in 350ms var(--big-preview-ease) forwards;
+      }
+
+      .preview,
+      .preview video {
+        opacity: 1 !important;
+        animation: none !important;
+      }
+    }
+
+    .preview {
+      cursor: pointer;
+      border-radius: 16px;
+      overflow: hidden;
+      display: inline-flex;
+      width: fit-content;
+      height: fit-content;
+      max-width: 98vw;
+      max-height: var(--big-preview-video-max-height);
+      left: 50%;
+      top: calc(50% + var(--big-preview-video-offset-y));
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      opacity: 1;
+      animation: none;
+      transition-duration: 0s;
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.14),
+        0 28px 90px rgba(0, 0, 0, 0.62),
+        0 0 140px rgba(var(--v-theme-primary), 0.28),
+        0 0 70px rgba(255, 196, 92, 0.1);
+      // Let blurred thumb/grid show through letterbox / side insets.
+      background-color: transparent;
+      // Transform on this shell breaks overflow clipping of hardware
+      // <video> in Electron — round + clip the video element itself.
+      video {
+        display: block;
+        opacity: 1 !important;
+        animation: none;
+        transition-duration: 0s;
+        background-color: transparent;
+        min-width: 0;
+        min-height: 0;
+        width: auto;
+        height: auto;
+        // Keep the fit box ≥16:9 so landscape is height-limited
+        // (side insets) instead of width-limited (edge-to-edge flush).
+        max-width: 98vw;
+        max-height: min(
+          var(--big-preview-video-max-height),
+          calc(96vw * 9 / 16)
+        );
+        object-fit: contain;
+        border-radius: 16px;
+        clip-path: inset(0 round 16px);
+        -webkit-clip-path: inset(0 round 16px);
+        pointer-events: none;
+      }
+    }
+
+    &:not(.video-preview-container--expanding):not(.video-preview-container--collapsing) .preview {
+      animation: big-preview-plate-settle 520ms var(--big-preview-ease) both;
+    }
+
+    &.video-preview-container--collapsing {
+      .thumb {
+        animation: none;
+        filter: blur(0);
+        width: 100%;
+        min-width: 100%;
+        height: 100%;
+        left: 0;
+        top: 0;
+        opacity: 1;
+        z-index: 1;
+        transition:
+          width 350ms ease-in-out,
+          min-width 350ms ease-in-out,
+          height 350ms ease-in-out,
+          left 350ms ease-in-out,
+          top 350ms ease-in-out,
+          filter 280ms ease-in,
+          opacity 220ms ease-in;
+      }
+
+      .preview {
+        left: 0 !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        transform: none !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: inherit;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+        opacity: 1 !important;
+        transition: opacity 350ms ease-in !important;
+        background-color: transparent !important;
+        box-shadow: none;
+
+        video {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none !important;
+          max-height: none !important;
+          min-width: 0 !important;
+          min-height: 0 !important;
+          object-fit: contain;
+          opacity: 1 !important;
+          transition: none !important;
+        }
+      }
+
+      .preview-playback-timeline,
+      .big-preview-chrome {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease-out;
+      }
+    }
+
+    &.video-preview-container--collapsing.video-preview-container--preview-fading {
+      .preview {
+        opacity: 0 !important;
+      }
+    }
+
+    &.big-preview-size-original .preview {
+      video {
+        max-width: min(var(--big-preview-native-width, 98vw), 98vw);
+        max-height: min(
+          var(--big-preview-native-height, var(--big-preview-video-max-height)),
+          var(--big-preview-video-max-height),
+          calc(96vw * 9 / 16)
+        );
+      }
+    }
+    &.big-preview-size-full-height .preview {
+      video {
+        // Stretch up to the same ≥16:9 fit box (side insets + rounded corners).
+        height: min(var(--big-preview-video-max-height), calc(96vw * 9 / 16));
+        width: auto;
+        max-width: 98vw;
+        max-height: min(var(--big-preview-video-max-height), calc(96vw * 9 / 16));
+      }
+    }
+    &.big-preview-size-two-thirds .preview {
+      video {
+        height: min(
+          calc(var(--big-preview-video-max-height) * 2 / 3),
+          calc(96vw * 9 / 16)
+        );
+        width: auto;
+        max-width: 98vw;
+        max-height: min(
+          calc(var(--big-preview-video-max-height) * 2 / 3),
+          calc(96vw * 9 / 16)
+        );
+      }
+    }
+    &.big-preview-size-half .preview {
+      video {
+        height: min(
+          calc(var(--big-preview-video-max-height) / 2),
+          calc(96vw * 9 / 16)
+        );
+        width: auto;
+        max-width: 98vw;
+        max-height: min(
+          calc(var(--big-preview-video-max-height) / 2),
+          calc(96vw * 9 / 16)
+        );
+      }
+    }
+    .big-preview-chrome {
+      position: absolute;
+      inset: 0;
+      z-index: 1012;
+      pointer-events: none;
+      animation: preview-timeline-appear 420ms var(--big-preview-ease) 60ms both;
+
+      &__top {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: var(--big-preview-safe-top);
+        padding: 8px var(--big-preview-pad-x) 0;
+        box-sizing: border-box;
+      }
+
+      &__title {
+        min-width: 0;
+        max-width: min(58vw, 720px);
+        padding: 5px 12px;
+        border-radius: 12px;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: rgba(12, 12, 16, 0.42);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.32);
+        backdrop-filter: blur(18px) saturate(1.4);
+        -webkit-backdrop-filter: blur(18px) saturate(1.4);
+      }
+
+      &__meta {
+        display: inline-flex;
+        align-items: stretch;
+        flex-shrink: 0;
+        overflow: hidden;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.32);
+        backdrop-filter: blur(18px) saturate(1.4);
+        -webkit-backdrop-filter: blur(18px) saturate(1.4);
+      }
+
+      &__quality,
+      &__height {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 8px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      &__quality {
+        background: rgb(236, 197, 22);
+        color: #111;
+
+        &.sd { background-color: #db8e6b; }
+        &.hd { background-color: #e2e2e2; }
+        &.fhd { background-color: #ffee00; }
+        &.uhd { background-color: #00ffff; }
+        &.vert { background-color: #e674b6; }
+      }
+
+      &__height {
+        color: #fff;
+        background: rgba(8, 8, 12, 0.72);
+      }
+
+      &__hint {
+        position: absolute;
+        left: 50%;
+        bottom: calc(var(--big-preview-safe-bottom) + var(--big-preview-chrome-gap));
+        transform: translateX(-50%);
+        padding: 4px 10px;
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 0.72rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        line-height: 1.2;
+        white-space: nowrap;
+        background: rgba(12, 12, 16, 0.32);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(16px) saturate(1.3);
+        -webkit-backdrop-filter: blur(16px) saturate(1.3);
+      }
+    }
+
+    .preview-mute-btn {
+      flex-shrink: 0;
+      width: 36px !important;
+      height: 36px !important;
+      color: #fff !important;
+      pointer-events: auto;
+      background: rgba(12, 12, 16, 0.42) !important;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(18px) saturate(1.35);
+      -webkit-backdrop-filter: blur(18px) saturate(1.35);
+
+      .v-icon {
+        color: #fff !important;
+      }
+
+      &:hover {
+        background: rgba(12, 12, 16, 0.58) !important;
+      }
+    }
+
+    .preview-playback-timeline {
+      z-index: 1013;
+      min-height: var(--big-preview-safe-bottom);
+      padding: 8px var(--big-preview-pad-x) 12px;
+      box-sizing: border-box;
+      pointer-events: auto;
+      background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.42) 100%);
+
+      &--cinema .preview-playback-timeline__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 36px;
+      }
+
+      &--cinema .preview-playback-timeline__track {
+        overflow: visible;
+        cursor: pointer;
+        position: relative;
+
+        &::before {
+          content: "";
+          position: absolute;
+          inset: -12px 0;
+        }
+      }
+
+      &__track {
+        flex: 1;
+        height: 5px;
+        margin-bottom: 0;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
+        transition: height 160ms ease;
+      }
+
+      &--cinema:hover .preview-playback-timeline__track {
+        height: 8px;
+      }
+
+      &__fill {
+        position: relative;
+        box-shadow: 0 0 16px rgba(var(--v-theme-primary), 0.45);
+        transition: none;
+      }
+
+      &__knob {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow:
+          0 0 0 4px rgba(var(--v-theme-primary), 0.32),
+          0 2px 8px rgba(0, 0, 0, 0.4);
+        transform: translate(50%, -50%);
+        pointer-events: none;
+      }
+
+      &__time {
+        flex-shrink: 0;
+        animation: none;
+      }
+
+      &__chip {
+        font-size: 0.82rem;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+      }
+    }
+
+    &.video-preview-container--chrome-hidden {
+      .big-preview-chrome,
+      .preview-playback-timeline {
+        animation: none;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 280ms ease;
+      }
+    }
+  }
+  .thumb {
+    // Oversample slightly on both axes — width-only 101% + top:-0.5% left a
+    // 1px black gap along the bottom edge of the card thumb.
+    // v-responsive defaults to max-width/height 100%, which cancelled the
+    // oversample and left the poster short of the card width.
+    position: absolute;
+    inset: -1px;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    flex: none;
+    background-color: #000;
+    // Under the hover <video>: always painted so leave fades never expose the
+    // card underlay (gray≈white) or a blank video frame (black).
+    z-index: 1;
+    opacity: 1;
+
+    .v-img__img {
+      width: 100%;
+      height: 100%;
+      // Default contain so portrait / ultrawide are not stretched.
+      object-fit: contain;
+      background-color: #000;
+    }
+
+    &.thumb--cover .v-img__img {
+      object-fit: cover;
+    }
+
+    &.thumb--grid-frame {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+
+      .grid-sprite-frame {
+        flex-shrink: 0;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .grid-sprite-sheet {
+        position: absolute;
+        pointer-events: none;
+      }
+    }
+  }
+  .preview-unavailable-notice {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px;
+    box-sizing: border-box;
+    background: rgba(11, 11, 11, 0.78);
+    color: #e16363;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.35;
+    font-weight: 500;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .preview {
+    opacity: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    overflow: hidden;
+    position: absolute;
+    z-index: 2;
+    animation: none;
+    box-shadow: #1110 0 0 0 0;
+    transition-duration: 0.5s;
+    transition-property: box-shadow;
+    // Transparent so the static thumb shows through letterbox + while video fades.
+    background-color: transparent;
+    video {
+      min-width: 100%;
+      min-height: 100%;
+      object-fit: contain;
+      background-color: transparent;
+      opacity: 0;
+      // Must match HOVER_PREVIEW_THUMB_CROSSFADE_MS (leave hold before unmount).
+      transition: opacity 520ms ease-in-out;
+    }
+    .playback-error {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(11, 11, 11, 0.75);
+      color: #e16363;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .video-playback-error {
+      display: none;
+    }
+  }
+  .rating,
+  .duration,
+  .resolution {
+    z-index: 3;
+  }
+  &:hover,
+  &.is-hovered,
+  &.is-preview-active {
+    .v-icon.mdi-star:not(.yellow--text) {
+      color: rgba(255, 255, 255, 0.5) !important;
+    }
+  }
+
+  // Timeline hover is a grid-sprite layer, not a zoomed poster. Keep this
+  // explicit because the poster has its own generic :hover transform rules.
+  &.timeline-preview-active:not(.video-preview-container--expanded) {
+    .thumb {
+      pointer-events: none;
+      transform: none !important;
+      z-index: 1;
+    }
+
+    .timeline {
+      opacity: 1 !important;
+      z-index: 2;
+      pointer-events: auto;
+    }
+  }
+
+  &.is-hover-preview-ready:not(.video-preview-container--expanded) {
+    .thumb {
+      // Stay painted under the fading video (do not hide — that caused flashes).
+      pointer-events: none;
+    }
+
+    .preview video {
+      opacity: 1;
+    }
+
+    .preview,
+    .timeline {
+      pointer-events: auto;
+    }
+  }
+
+  &.video-preview-container--expanded {
+    .thumb {
+      z-index: 0;
+    }
+
+    .preview {
+      z-index: 1000;
+    }
+  }
+  .progress {
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(125, 125, 125, 0.25);
+  }
+
+  .preview-playback-timeline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    padding: 10px 10px 8px;
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.28) 100%);
+    pointer-events: none;
+    user-select: none;
+    animation: preview-timeline-appear 320ms ease-out both;
+
+    &__track {
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.28);
+      overflow: hidden;
+      margin-bottom: 6px;
+      animation: preview-timeline-item-appear 280ms ease-out both;
+    }
+
+    &__fill {
+      height: 100%;
+      border-radius: inherit;
+      background: rgb(var(--v-theme-primary));
+      width: 0;
+      transition: width 120ms linear;
+    }
+
+    &__time {
+      display: flex;
+      justify-content: center;
+      animation: preview-timeline-item-appear 320ms ease-out 60ms both;
+    }
+
+    &__chip {
+      font-variant-numeric: tabular-nums;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background-color: rgba(0, 0, 0, 0.42) !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+    }
+  }
+}
+
+@keyframes go-full-screen {
+  from {
+    top: var(--preview-top);
+    left: var(--preview-left);
+    right: auto;
+    bottom: auto;
+    width: var(--preview-width);
+    height: var(--preview-height);
+  }
+  to {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+  }
+}
+
+@keyframes appearing {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes preview-timeline-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes preview-timeline-item-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes video-big-preview-thumb-blur-in {
+  from {
+    filter: blur(0) saturate(1) brightness(1);
+    opacity: 0.96;
+  }
+  to {
+    filter: blur(56px) saturate(1.55) brightness(0.36);
+    opacity: 1;
+  }
+}
+
+@keyframes big-preview-plate-settle {
+  from {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 8px 24px rgba(0, 0, 0, 0.28);
+  }
+  to {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.14),
+      0 28px 90px rgba(0, 0, 0, 0.62),
+      0 0 140px rgba(var(--v-theme-primary), 0.28),
+      0 0 70px rgba(255, 196, 92, 0.1);
+  }
+}
+
+body > .video-preview-container.video-preview-container--expanded {
+  z-index: 3000;
+}
+
+/* macOS Electron: push chrome-top right past traffic-light window controls */
+.video-preview-container--darwin-electron.video-preview-container--expanded {
+  .big-preview-chrome__top {
+    padding-left: calc(var(--big-preview-pad-x) + 70px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-preview-container.video-preview-container--expanded {
+    &::before,
+    &::after,
+    .thumb,
+    .preview,
+    .big-preview-chrome,
+    .preview-playback-timeline {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    &::before,
+    &::after {
+      opacity: 1;
+    }
+
+    .thumb {
+      filter: var(--big-preview-thumb-filter);
+    }
+  }
+}
+
+.fav-in-card {
+  transform: none;
+}
+
+.image-preview-wrap {
+  position: relative;
+  flex: 1 0 auto;
+
+  .image-resolution {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    z-index: 5;
+    padding: 2px 6px;
+    line-height: 1.2;
+    font-size: 0.75em;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    border-radius: 3px;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
+.image-preview-container {
+  transition: 0.2s all ease;
+  background-color: #7878782b;
+  cursor: zoom-in;
+
+  .thumb {
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+  }
+}
+
+.item-media.item-view-1 {
+  .image-preview-container {
+    flex: 1 0 auto;
+  }
+}
+
+.item-media.item-view-4,
+.item-tag.item-view-4 {
+  .item_wrapper {
+    overflow: hidden;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .item_wrapper > .v-card__underlay {
+    display: none;
+  }
+
+  .description {
+    display: none;
+  }
+
+  .item_preview {
+    border-radius: inherit;
+    background-color: transparent;
+  }
+
+  .video-preview-container,
+  .video-preview-host,
+  .item_preview__placeholder {
+    background-color: transparent !important;
+  }
+
+  .item-minimal-filename {
+    margin-top: 6px;
+    min-width: 0;
+    padding-left: 10px;
+    padding-right: 10px;
+    cursor: pointer;
+  }
+
+  .item-minimal-filename__text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+// Compact single-column row list, laid out as one flex row:
+//   [preview — full row height] [name + synonym / meta, 2 lines] [rating + favorite] [menu button]
+// Rows are divided by a thin border rather than the grid gap, so the list
+// stays dense regardless of the gap-size setting. Row heights are kept in
+// sync with LIST_ROW_HEIGHT in utils/gridLayout.ts.
+// Available for media items and the tag grid (view 5).
+.item-media.item-view-5,
+.item-tag.item-view-5 {
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+
+  // Media rows use an opaque v-card that fills the item and paints over the
+  // parent outline — so the primary ring vanished on the sides (only the
+  // 1px divider gap leaked a sliver of top/bottom). Tag rows already had a
+  // transparent wrapper, which is why their selection looked correct.
+  // Draw the ring as an overlay instead, matching tags: rectangular, primary,
+  // inset to the inner edge of the row.
+  &.item--inspector-focused,
+  &.item--keyboard-cursor {
+    border-radius: 0;
+    outline: none;
+    outline-offset: 0;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      border: 2px solid rgb(var(--v-theme-primary));
+      border-radius: 0;
+      pointer-events: none;
+    }
+  }
+
+  &.item--selecting {
+    border-radius: 0;
+  }
+
+  // The selection overlay's 17px radius is sized for the rounded card view —
+  // on a flat, edge-to-edge row it read as a floating rounded pill that
+  // swallowed the row's own divider border. Flatten it to match.
+  // Same for the favorite glow: the card-sized 16px radius read as rounded
+  // corners hanging off a rectangular list row.
+  .item-select-overlay {
+    border-radius: 0;
+  }
+
+  &.favorite::after {
+    border-radius: 0;
+  }
+
+  .item_wrapper {
+    // Vuetify's .v-card sets `display: block` at the same specificity as our
+    // base `.item_wrapper{display:flex}` — whichever loads last wins the tie.
+    // State it explicitly here so this row layout never depends on that race.
+    display: flex;
+    flex-direction: row;
+    // Height is fixed per size below (not auto) so the preview can stretch
+    // to exactly fill it — a description with 2 lines of text/meta no longer
+    // grows the row taller than the thumbnail.
+    align-items: stretch;
+    border-radius: 0;
+    box-shadow: none;
+    background-color: transparent;
+    // No overflow:hidden here — this row has no radius to clip against, and
+    // clipping it squashed the menu button's hover/ripple overlay into an
+    // oval against the row's short height. The preview clips its own image.
+    transition: background-color 0.15s ease;
+  }
+
+  .item_wrapper > .v-card__underlay {
+    display: none;
+  }
+
+  .item_wrapper:hover {
+    background-color: rgba(var(--v-theme-on-surface), 0.05);
+  }
+
+  // Preview fills the row's full height, flush against the edge. Rounding
+  // lives on the outer grid container instead of on individual rows.
+  .item_preview {
+    flex: 0 0 auto;
+    height: 100%;
+    margin: 0;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  // Tag thumbs use the category's imageAspectRatio (--tag-preview-aspect)
+  // instead of the 16:9-ish media list column.
+  .tag-list-thumb {
+    width: 100%;
+    height: 100%;
+
+    .v-img,
+    .main-img {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  &.item-tag {
+    // No hover zoom on a small row thumbnail.
+    .main-img:not(.static) {
+      &:hover {
+        .v-image__image,
+        .v-img__img {
+          transform: none;
+        }
+      }
+    }
+  }
+
+  .v-progress-linear {
+    display: none;
+  }
+
+  // Name + synonym share line 1; meta is forced onto line 2 (flex-basis 100%).
+  // DOM order alone puts this after the preview and before rating/favorite —
+  // no explicit `order` needed (a stray one here previously reshuffled the row).
+  .description {
+    flex: 1 1 auto;
+    // Flex items default to min-height:auto, which refuses to shrink below
+    // content size — at small sizes that pushed 2 lines of text past the
+    // fixed row height instead of clipping. min-height:0 lets it actually
+    // stretch to (and clip at) the row height like everything else here.
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    display: flex;
+    flex-flow: row wrap;
+    align-content: center;
+    align-items: baseline;
+    column-gap: 8px;
+    row-gap: 2px;
+    padding: 2px 10px;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  // Name stays content-sized so the synonym sits immediately after it,
+  // not flush against the right of the row. Both can still shrink so a
+  // long name doesn't shove the synonym onto line 2.
+  .item-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    line-height: 1.25;
+    font-weight: 500;
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Synonym sits next to the name on line 1, but never dominates it.
+  .synonyms {
+    display: block;
+    flex: 0 1 auto;
+    max-width: 40%;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 0.8em;
+    opacity: 0.65;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Meta (tags/pinned values/preset meta) — forced to its own line, always
+  // clipped to one row regardless of whether the "group chips" setting is on
+  // (stacked categories) or off (flat chip list).
+  .nested-tags {
+    flex: 1 0 100%;
+    max-width: 100%;
+    overflow: hidden;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+
+    > div {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      max-width: 100%;
+    }
+
+    .category {
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+      width: auto;
+      max-width: 60%;
+      flex-wrap: nowrap;
+      margin-top: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .category-name {
+      flex: 0 0 auto;
+      margin-right: 0.3em;
+      font-size: 0.82em;
+      white-space: nowrap;
+
+      .v-icon {
+        margin-right: 0;
+      }
+    }
+
+    .v-chip {
+      flex: 0 0 auto;
+      min-height: 17px !important;
+      font-size: 0.72em !important;
+    }
+  }
+
+  // Rating + favorite: their own segment, always inline (one row), between
+  // the meta block and the menu button. Icon size is set per item__size
+  // below (CSS custom properties can't self-reference to scale an inherited
+  // value, so the scaled numbers are hardcoded per size at build time).
+  .list-rating-favorite {
+    // Sitting on the row background (not over a thumbnail), the components'
+    // own inline empty-state color (#eee) is too light to read — darken it,
+    // same override mechanism as .rating-favorite-in-description below.
+    --item-rating-favorite-muted-color: #7a7a7a;
+    --item-rating-star-gap: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 0 6px;
+  }
+
+  .list-rating-favorite .rating,
+  .list-rating-favorite .fav-btn {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    // .fav-btn's base rule pads it 6px top/right for the absolute-over-
+    // thumbnail placement it normally has — that offset doesn't apply here
+    // and was pushing the heart down and off-center from the stars.
+    padding: 0 !important;
+    align-self: center;
+    background-color: transparent;
+    opacity: 1;
+  }
+
+  // Extra breathing room before the heart, on top of the container's gap.
+  .list-rating-favorite .fav-btn {
+    margin-left: 6px !important;
+  }
+
+  .list-rating-favorite .rating .v-btn:not(.text-yellow-darken-2) .v-icon {
+    color: var(--item-rating-favorite-muted-color) !important;
+  }
+
+  // Match the star's muted gray unconditionally, then restore Vuetify's
+  // pink only once actually favorited (via the item's own .favorite class,
+  // rather than relying on a v-selection-control internal state class) —
+  // that state is already reliably set elsewhere (the row's favorite glow).
+  // Vuetify also dims the unchecked checkbox icon to opacity:0.6 — the star
+  // renders at full opacity, so without this override the same color still
+  // reads as a lighter gray.
+  .list-rating-favorite .fav-btn .v-icon {
+    color: var(--item-rating-favorite-muted-color) !important;
+    opacity: 1 !important;
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+
+  &.favorite .list-rating-favorite .fav-btn .v-icon {
+    color: #e91e63 !important;
+  }
+
+  .list-rating-favorite .fav-btn:hover .v-icon {
+    transform: scale(1.2);
+  }
+
+  &.favorite .list-rating-favorite .fav-btn:hover .v-icon {
+    color: #ff4081 !important;
+  }
+
+  // Quality/duration badges on the thumbnail, scaled down to match the much
+  // smaller list preview, with rounding removed (flat design, see below).
+  .duration {
+    padding: 1px 3px;
+    font-size: 0.6em;
+    border-radius: 0;
+  }
+
+  .resolution {
+    border-radius: 0;
+    transform: scale(0.75);
+    transform-origin: top left;
+  }
+
+  .bookmark {
+    top: 3px;
+    left: 3px;
+    right: auto;
+    font-size: 1.05em;
+  }
+
+  // Menu button is the last item in the row, not a floating overlay. Forced
+  // to a small fixed size so it always fits inside the row — Vuetify renders
+  // icon buttons at `--v-btn-height + 12px` (default density), so its
+  // `size="small"` (28px var) was actually a 40px button; barely fitting a
+  // compact row meant its circular hover/ripple overlay got clipped by the
+  // row's overflow:hidden, which read as a "distorted gray" hover background.
+  // 14px var here renders a 26px button, comfortably inside every size.
+  .item-menu-btn {
+    // relative, not static: it must stay a positioning context for its own
+    // absolutely-positioned children. static let Vuetify's overlay resolve
+    // against `.item` (the whole row) as its nearest positioned ancestor and
+    // stretch into a huge misshapen gray blob on hover.
+    position: relative;
+    inset: auto;
+    align-self: center;
+    flex: 0 0 auto;
+    margin: 0 4px 0 0;
+    opacity: 0.55;
+    --v-btn-height: 14px;
+    // Hover feedback is drawn on the button itself (a small circular fill
+    // matching the icon button's 50% radius) so it can never escape the
+    // button bounds the way Vuetify's overlay did. Vuetify's own overlay is
+    // kept hidden below to avoid double-highlighting.
+    background-color: transparent;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+  }
+
+  .item-menu-btn .v-btn__overlay {
+    display: none;
+  }
+
+  .item-menu-btn:hover {
+    background-color: rgba(var(--v-theme-on-surface), 0.08);
+    opacity: 1;
+  }
+
+  &:hover .item-menu-btn {
+    opacity: 1;
+  }
+
+  // Row height is fixed here (drives the preview's stretched height via
+  // align-items:stretch above); preview width alone sets its aspect ratio.
+  // Kept in sync with LIST_ROW_HEIGHT in utils/gridLayout.ts (that table
+  // adds the 1px divider border on top of these heights). The floor is
+  // raised well above XS's old 31px — that was too tight to fit the menu
+  // button and two text lines without clipping.
+  &.item__size-1 {
+    .item_wrapper { height: 44px; }
+    .item_preview { width: 78px; }
+    .list-rating-favorite { --item-rating-icon: 12px; --item-fav-icon: 13px; }
+  }
+  &.item__size-2 {
+    .item_wrapper { height: 52px; }
+    .item_preview { width: 92px; }
+    .list-rating-favorite { --item-rating-icon: 15px; --item-fav-icon: 16px; }
+  }
+  &.item__size-3 {
+    .item_wrapper { height: 60px; }
+    .item_preview { width: 107px; }
+    .list-rating-favorite { --item-rating-icon: 19px; --item-fav-icon: 20px; }
+  }
+  &.item__size-4 {
+    .item_wrapper { height: 68px; }
+    .item_preview { width: 121px; }
+    .list-rating-favorite { --item-rating-icon: 21px; --item-fav-icon: 22px; }
+  }
+  &.item__size-5 {
+    .item_wrapper { height: 76px; }
+    .item_preview { width: 135px; }
+    .list-rating-favorite { --item-rating-icon: 22px; --item-fav-icon: 24px; }
+  }
+  &.item__size-6 {
+    .item_wrapper { height: 84px; }
+    .item_preview { width: 149px; }
+    .list-rating-favorite { --item-rating-icon: 24px; --item-fav-icon: 25px; }
+  }
+}
+
+// Non-video media list previews: square, sized from the row height just like
+// tags below. Video keeps its wider 16:9 column.
+.item-media.item-view-5 {
+  @for $i from 1 through 6 {
+    &.item__size-#{$i} .item_preview {
+      width: auto;
+      height: 100%;
+      aspect-ratio: 1;
+    }
+  }
+
+  // Video: keep 16:9.
+  .item_preview:has(.video-preview-container),
+  .item_preview:has(.video-preview-host) {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+.item-tag.item-view-5 {
+  @for $i from 1 through 6 {
+    &.item__size-#{$i} .item_preview {
+      width: auto;
+      height: 100%;
+      aspect-ratio: var(--tag-preview-aspect, 1);
+    }
+  }
+}
+
+// Give tag list rows a visible surface background (view-5 item_wrapper is transparent by default).
+.item-tag.item-view-5 .item_wrapper {
+  background: rgb(var(--v-theme-surface));
+}
+
+.item-media.item-view-3,
+.item-media.item-view-6 {
+  .item_wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .item-menu-btn {
+    opacity: 0.85;
+    z-index: 7;
+  }
+
+  .description {
+    display: none;
+  }
+
+  .masonry-meta-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    padding: 40px 36px 8px 8px;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.9) 0%,
+      rgba(0, 0, 0, 0.82) 28%,
+      rgba(0, 0, 0, 0.58) 52%,
+      rgba(0, 0, 0, 0.32) 72%,
+      rgba(0, 0, 0, 0.12) 88%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    color: #fff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    max-height: 80%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    cursor: pointer;
+    content-visibility: visible;
+  }
+
+  &:hover .masonry-meta-overlay,
+  &:focus-within .masonry-meta-overlay,
+  .item_wrapper:hover .masonry-meta-overlay,
+  .item_wrapper:focus-within .masonry-meta-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .masonry-meta-overlay__rating {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    width: calc(100% + 44px);
+    margin-left: -8px;
+    margin-right: -36px;
+    padding-left: 8px;
+    padding-right: 8px;
+    box-sizing: border-box;
+    min-width: 0;
+    margin-bottom: 0;
+    pointer-events: none;
+
+    &-left,
+    &-right {
+      display: flex;
+      align-items: center;
+      pointer-events: auto;
+    }
+
+    &-left {
+      grid-column: 1;
+      justify-self: start;
+      justify-content: flex-start;
+      min-width: 0;
+    }
+
+    &-right {
+      grid-column: 2;
+      justify-self: end;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .rating {
+      position: relative;
+      bottom: auto;
+      left: auto;
+      margin: 0;
+      background-color: transparent;
+      opacity: 1;
+
+      .v-icon {
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      }
+    }
+
+    .fav-btn {
+      position: relative;
+      top: auto;
+      right: auto;
+      margin: 0;
+      opacity: 1;
+      transform: none;
+      text-shadow: none;
+
+      .v-icon {
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+      }
+    }
+  }
+
+  .masonry-meta-overlay__title {
+    font-size: 0.82em;
+    font-weight: 500;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+
+  .masonry-meta-overlay .nested-tags {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    > div {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .category {
+      margin-top: 0.15em;
+      padding: 0;
+      width: 100%;
+    }
+
+    .category-name {
+      font-size: 0.72em;
+      color: rgba(255, 255, 255, 0.82);
+      margin-right: 0.35em;
+      flex: 0 0 auto;
+    }
+
+    .v-chip:not(.tag-chip--colored),
+    .v-chip.tag-chip--colored {
+      margin: 0 !important;
+      padding: 0 !important;
+      min-height: 22px;
+      font-size: 0.72em !important;
+      max-width: 100%;
+
+      .v-chip__content {
+        padding-inline: 6px !important;
+      }
+
+      &:has(.v-chip__prepend) {
+        .v-chip__prepend {
+          margin-left: 10px !important;
+          margin-right: 2px !important;
+        }
+
+        .v-chip__content {
+          padding-left: 0 !important;
+          padding-right: 6px !important;
+        }
+      }
+    }
+
+    .v-chip:not(.tag-chip--colored) {
+      background: rgba(255, 255, 255, 0.92) !important;
+      color: rgba(0, 0, 0, 0.87) !important;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+
+    .v-chip.tag-chip--colored {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .v-chip .v-icon {
+      color: inherit !important;
+      opacity: 0.85;
+    }
+  }
+
+  @media (hover: none) {
+    .masonry-meta-overlay {
+      opacity: 1;
+      pointer-events: auto;
+      max-height: 48%;
+      padding-top: 16px;
+    }
+  }
+}
+
+// END VIDEOS
+
+.item__size {
+  &-1 {
+    &.item {
+      font-size: 0.78rem;
+      --item-rating-icon: 17px;
+      --item-fav-icon: 19px;
+      --item-rating-star-gap: 0px;
+    }
+  }
+  &-2 {
+    &.item {
+      font-size: 0.9rem;
+      --item-rating-icon: 21px;
+      --item-fav-icon: 23px;
+      --item-rating-star-gap: 0px;
+    }
+  }
+  &-3 {
+    &.item {
+      font-size: 1rem;
+      --item-rating-icon: 28px;
+      --item-fav-icon: 30px;
+      --item-rating-star-gap: 1px;
+    }
+  }
+  &-4 {
+    &.item {
+      font-size: 1.08rem;
+      --item-rating-icon: 30px;
+      --item-fav-icon: 32px;
+      --item-rating-star-gap: 1px;
+    }
+  }
+  &-5 {
+    &.item {
+      font-size: 1.16rem;
+      --item-rating-icon: 32px;
+      --item-fav-icon: 34px;
+      --item-rating-star-gap: 2px;
+    }
+  }
+  &-6 {
+    &.item {
+      font-size: 1.24rem;
+      --item-rating-icon: 34px;
+      --item-fav-icon: 36px;
+      --item-rating-star-gap: 2px;
+    }
+  }
+}
+
+// layouts
+.card-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--grid-gap-y, 15px) var(--grid-gap-x, 10px);
+
+  > .item {
+    flex: 0 0 var(--card-width, 250px);
+    width: var(--card-width, 250px);
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: visible;
+  }
+}
+
+.virtual-grid-row.card-grid {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 0 var(--grid-gap-x, 10px);
+  margin-bottom: var(--grid-gap-y, 15px);
+  overflow: visible;
+}
+
+.virtual-grid-row.chips-grid {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0 var(--grid-gap-x, 10px);
+  margin-bottom: var(--grid-gap-y, 10px);
+  overflow: visible;
+
+  .item-tag.item-view-2 {
+    margin: 0;
+    flex: 0 0 auto;
+  }
+}
+
+// storyboard
+.line-grid {
+  .item-media {
+    margin-bottom: 15px;
+    .content {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+  }
+  .item__size {
+    &-1 {
+      .item-media {
+        font-size: 0.7rem;
+      }
+      .v-icon {
+        font-size: 1rem !important;
+      }
+    }
+    &-2 {
+      .item-media {
+        font-size: 0.9rem;
+      }
+      .v-icon {
+        font-size: 1.2rem !important;
+      }
+    }
+    &-4 {
+      .item-media {
+        font-size: 1.2rem;
+      }
+      .v-icon {
+        font-size: 1.6rem !important;
+      }
+    }
+    &-5 {
+      .item-media {
+        font-size: 1.4rem;
+      }
+      .v-icon {
+        font-size: 2rem !important;
+      }
+    }
+    &-6 {
+      .item-media {
+        font-size: 1.8rem;
+      }
+      .v-icon {
+        font-size: 2.6rem !important;
+      }
+    }
+  }
+}
+
+.chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+
+  .item.item-tag.item-view-2 {
+    &.item--selecting,
+    &.item--inspector-focused,
+    &.item--keyboard-cursor,
+    &.item--tag-drop-target {
+      border-radius: 999px;
+    }
+
+    .item-select-overlay {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      border-radius: inherit;
+    }
+
+    .item-select-btn {
+      position: relative;
+      top: auto;
+      left: auto;
+      box-sizing: border-box;
+      width: var(--tag-chip-avatar-size, 32px);
+      height: var(--tag-chip-avatar-size, 32px);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+  }
+
+  .tag-chip-view {
+    display: inline-flex !important;
+    align-items: stretch;
+    padding-inline: 0 !important;
+    padding-block: 0 !important;
+    border-radius: 999px !important;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition: transform 0.18s ease;
+
+    .v-chip__content {
+      display: inline-flex;
+      align-items: center;
+      height: 100%;
+      padding-inline: 0 !important;
+      padding-block: 0 !important;
+    }
+
+    &__label {
+      margin-inline: 4px 5px;
+      line-height: 1.1;
+      padding: 0;
+      white-space: nowrap;
+    }
+
+    &:hover {
+      transform: translateY(-1px);
+    }
+
+    .tag-chip-avatar-wrap {
+      display: flex;
+      flex-shrink: 0;
+      align-self: stretch;
+      box-shadow: none;
+    }
+
+    .tag-chip-avatar {
+      flex-shrink: 0;
+      width: var(--tag-chip-avatar-size) !important;
+      height: var(--tag-chip-avatar-size) !important;
+      min-width: var(--tag-chip-avatar-size) !important;
+      max-width: var(--tag-chip-avatar-size) !important;
+      border-radius: 50% !important;
+      box-shadow: none !important;
+    }
+
+    .tag-chip-avatar .v-img {
+      width: 100%;
+      height: 100%;
+      box-shadow: none !important;
+    }
+  }
+
+  .item-tag.item-view-2 {
+    margin: 0 5px 10px;
+  }
+  .favorite {
+    .tag-chip-view {
+      box-shadow: 0 0 0 1px #ff004b;
+
+      &:hover {
+        box-shadow: 0 0 0 1px #ff004b;
+      }
+    }
+  }
+  .item__size {
+    &-1 {
+      --tag-chip-avatar-size: 20px;
+      .tag-chip-view {
+        height: 20px !important;
+
+        &__label {
+          margin-inline: 3px 4px;
+          font-size: 11px;
+        }
+      }
+    }
+    &-2 {
+      --tag-chip-avatar-size: 26px;
+      .tag-chip-view {
+        height: 26px !important;
+
+        &__label {
+          margin-inline: 3px 5px;
+          font-size: 12px;
+        }
+      }
+    }
+    &-3 {
+      --tag-chip-avatar-size: 32px;
+      .tag-chip-view {
+        height: 32px !important;
+      }
+    }
+    &-4 {
+      --tag-chip-avatar-size: 40px;
+      .tag-chip-view {
+        height: 40px !important;
+      }
+      .item-tag.item-view-2 {
+        font-size: 16px !important;
+        margin: 0 5px 12px;
+      }
+    }
+    &-5 {
+      --tag-chip-avatar-size: 48px;
+      .tag-chip-view {
+        height: 48px !important;
+      }
+      .item-tag.item-view-2 {
+        font-size: 16px !important;
+        margin: 0 5px 14px;
+      }
+    }
+    &-6 {
+      --tag-chip-avatar-size: 64px;
+      .tag-chip-view {
+        height: 64px !important;
+        font-size: 20px !important;
+      }
+      .item-tag.item-view-2 {
+        margin: 0 5px 16px;
+      }
+    }
+  }
+}
+
+.editing {
+  .editing-field-card {
+    position: relative;
+    overflow: visible;
+    border-radius: var(--edit-deck-radius, 16px) !important;
+
+    &--icons {
+      padding: 6px 8px !important;
+    }
+
+    &--plain {
+      padding: 2px 4px !important;
+    }
+
+    &--rating {
+      display: flex !important;
+      align-items: center;
+    }
+
+    // Room for the floating restore control over custom inputs.
+    &:has(.editing-field-restore--float) {
+      padding-inline-end: 40px !important;
+    }
+  }
+
+  .field {
+    position: relative;
+    overflow: visible;
+  }
+}
+
+.editing-rating-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 40px;
+
+  &--identity {
+    align-items: center;
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 16px;
+    min-height: 40px;
+
+    .editing-rating-field__name {
+      margin-top: 0;
+      line-height: 1.2;
+    }
+
+    .v-rating {
+      display: inline-flex;
+      align-items: center;
+      height: 30px;
+    }
+
+    .v-rating .v-btn {
+      width: 30px;
+      height: 30px;
+      min-width: 30px;
+    }
+
+    .v-rating .v-icon {
+      font-size: 22px;
+      width: 22px;
+      height: 22px;
+    }
+
+    .fav-btn {
+      margin: 0;
+      align-self: center;
+
+      .v-input__control,
+      .v-selection-control {
+        min-height: 30px !important;
+        height: 30px;
+      }
+
+      .v-selection-control,
+      .v-checkbox-btn {
+        min-width: 30px;
+        min-height: 30px !important;
+        height: 30px;
+      }
+
+      .v-selection-control__wrapper,
+      .v-selection-control__input {
+        width: 30px;
+        height: 30px;
+      }
+
+      .v-icon {
+        font-size: 22px;
+      }
+    }
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+    margin-inline-end: 2px;
+    opacity: 0.72;
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  &__rating {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__sep {
+    flex: 0 0 auto;
+    width: 1px;
+    height: 20px;
+    margin-inline: 8px;
+    background: rgba(var(--v-border-color), var(--v-border-opacity));
+  }
+
+  &__name {
+    flex: 0 0 auto;
+    font-size: 0.8125rem;
+    line-height: 1;
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    white-space: nowrap;
+  }
+
+  &__hint {
+    display: none;
+    max-width: 100%;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    color: rgba(var(--v-theme-on-surface), 0.5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // Keep the resting row height in sync with other fields; reveal the hint
+  // only while interacting, matching the show-on-focus hint fields elsewhere.
+  .editing-field-card:hover &__hint,
+  .editing-field-card:focus-within &__hint {
+    display: block;
+  }
+
+  .v-rating {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .v-rating .v-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+  }
+
+  .fav-btn {
+    flex: 0 0 auto;
+    margin: 0;
+
+    .v-selection-control {
+      min-height: 30px !important;
+      align-items: center;
+    }
+
+    .v-selection-control,
+    .v-checkbox-btn {
+      min-width: 28px;
+      min-height: 28px !important;
+      height: 28px;
+    }
+
+    .v-selection-control__wrapper,
+    .v-selection-control__input {
+      width: 28px;
+      height: 28px;
+    }
+  }
+}
+
+.editing-form {
+  padding-top: 4px !important;
+}
+
+.editing-overview {
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.editing-section {
+  & + & {
+    margin-top: 16px;
+  }
+
+  &__title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    margin-bottom: 8px;
+  }
+
+  &__toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 12px;
+
+    .editing-section__title {
+      margin-bottom: 0;
+      margin-right: 4px;
+    }
+  }
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+
+    & + & {
+      margin-left: 10px;
+      padding-left: 10px;
+      border-left: 1px solid rgba(var(--v-theme-on-surface), 0.14);
+    }
+
+    &--search {
+      flex: 1 1 auto;
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    &--tags,
+    &--filters {
+      flex: 0 0 auto;
+    }
+  }
+
+  &__group-label {
+    display: none;
+  }
+
+  &__search {
+    flex: 1 1 auto;
+    min-width: 120px;
+    max-width: none;
+    width: 100%;
+  }
+
+  &__tags-mode {
+    flex: 0 0 auto;
+  }
+
+  &__filters {
+    flex: 0 0 auto;
+
+    .v-chip-group__content {
+      flex-wrap: nowrap;
+    }
+  }
+
+  &__empty {
+    padding: 12px 4px 4px;
+  }
+}
+
+.editing-identity {
+  .v-input {
+    margin-bottom: 0;
+  }
+}
+
+.edit-dialog-card {
+  --edit-deck-pad-x: 14px;
+  --edit-deck-pad-y: 10px;
+  --edit-deck-gap: 10px;
+  --edit-deck-radius: 16px;
+  // Tall enough for filled floating labels above the value.
+  --edit-deck-control-h: 40px;
+  --edit-deck-search-h: 28px;
+
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+
+  @media (max-width: 959px) {
+    --edit-deck-pad-x: 12px;
+    --edit-deck-pad-y: 8px;
+    --edit-deck-gap: 8px;
+    --edit-deck-control-h: 36px;
+    --edit-deck-search-h: 26px;
+  }
+
+  &__body {
+    padding: var(--edit-deck-pad-y) var(--edit-deck-pad-x) !important;
+  }
+
+  .editing-section__toolbar {
+    gap: var(--edit-deck-gap);
+    margin-bottom: 12px;
+    padding: 2px 8px;
+    border: 1px solid rgba(var(--v-theme-primary), 0.16);
+    border-radius: var(--edit-deck-radius);
+    background: rgb(var(--v-theme-surface));
+    box-shadow:
+      0 1px 0 rgba(var(--v-theme-primary), 0.04),
+      0 8px 22px -16px rgba(0, 0, 0, 0.22);
+  }
+
+  .editing-section__search {
+    font-size: 0.75rem;
+
+    .v-field {
+      --v-input-control-height: var(--edit-deck-search-h);
+      font-size: 0.75rem;
+    }
+
+    .v-field__input {
+      min-height: var(--edit-deck-search-h) !important;
+      max-height: var(--edit-deck-search-h);
+      font-size: 0.75rem !important;
+      line-height: 1.2 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .v-field__prepend-inner,
+    .v-field__append-inner,
+    .v-field__clearable {
+      padding-top: 0;
+      align-self: center;
+    }
+
+    .v-label {
+      font-size: 0.6875rem;
+    }
+  }
+
+  .editing-section__filters {
+    .v-chip {
+      --v-chip-height: 24px;
+      font-size: 0.75rem;
+    }
+  }
+
+  .editing {
+    .v-field {
+      font-size: 0.8125rem;
+    }
+
+    .v-number-input {
+      .v-btn {
+        min-width: var(--edit-deck-control-h);
+        width: var(--edit-deck-control-h);
+        height: var(--edit-deck-control-h);
+      }
+
+      .v-field__append-inner,
+      .v-field__prepend-inner {
+        padding-top: 0;
+        align-self: center;
+      }
+    }
+
+    .v-input:not(.editing-section__search):not(.v-autocomplete--multiple):not(.v-combobox--multiple):not(.v-select--multiple) {
+      .v-field {
+        --v-input-control-height: var(--edit-deck-control-h);
+      }
+
+      .v-field__input {
+        min-height: var(--edit-deck-control-h) !important;
+        font-size: 0.8125rem !important;
+        line-height: 1.2 !important;
+      }
+
+      // Let auto-grow textareas (e.g. bookmark) expand past the shared control height.
+      // Exclude the hidden measuring sizer: it must stay height:0 to recompute
+      // shrinkage correctly, or growth gets stuck at its last measured height.
+      &.v-textarea .v-field__input:not(.v-textarea__sizer) {
+        height: var(--v-textarea-control-height, var(--edit-deck-control-h)) !important;
+        min-height: var(--edit-deck-control-h) !important;
+      }
+
+      // Filled/solo: keep floating label above the value (do not zero padding).
+      .v-field--variant-filled,
+      .v-field--variant-solo,
+      .v-field--variant-solo-filled,
+      .v-field--variant-solo-inverted {
+        .v-field__input {
+          padding-top: 14px !important;
+          padding-bottom: 4px !important;
+        }
+      }
+
+      .v-field--variant-outlined,
+      .v-field--variant-underlined,
+      .v-field--variant-plain {
+        .v-field__input {
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+        }
+      }
+
+      .v-field__prepend-inner,
+      .v-field__append-inner,
+      .v-field__clearable {
+        padding-top: 0;
+        align-self: center;
+      }
+    }
+
+    .v-autocomplete--multiple,
+    .v-combobox--multiple,
+    .v-select--multiple {
+      --v-input-padding-top: 14px;
+      --v-input-padding-bottom: 4px;
+
+      .v-field {
+        --v-field-padding-top: 14px;
+        --v-field-padding-bottom: 4px;
+        align-items: flex-start !important;
+      }
+
+      .v-field__field {
+        align-items: flex-start !important;
+      }
+
+      .v-field__input {
+        // Match the height of a single row of chips so the card doesn't
+        // shrink when empty.
+        min-height: 42px !important;
+        font-size: 0.8125rem !important;
+        line-height: 1.25 !important;
+        padding-block: 14px 4px !important;
+        flex-wrap: wrap;
+        align-content: flex-start !important;
+        align-items: center;
+        row-gap: 4px;
+        column-gap: 4px;
+      }
+
+      &.v-input--dirty .v-field__input,
+      .v-field--dirty .v-field__input,
+      .v-field--active .v-field__input {
+        padding-top: 14px !important;
+      }
+
+      .v-chip {
+        margin: 0 !important;
+      }
+
+      .v-field__prepend-inner,
+      .v-field__append-inner,
+      .v-field__clearable {
+        align-self: flex-start !important;
+        margin-top: 0 !important;
+        padding-top: 14px !important;
+      }
+    }
+
+    .v-label {
+      font-size: 0.75rem;
+    }
+
+    .v-messages {
+      font-size: 0.6875rem;
+      min-height: 14px;
+    }
+
+    .v-btn:not(.v-btn--icon):not(.restore) {
+      min-height: var(--edit-deck-control-h);
+      font-size: 0.8125rem;
+    }
+
+    // Match the tags-mode toggle to the filter chips beside it. The
+    // v-btn-group itself defaults to a taller compact height than its
+    // buttons, which pins them to the top instead of centering them.
+    .editing-section__tags-mode {
+      height: 24px !important;
+      align-items: center !important;
+    }
+
+    .editing-section__tags-mode .v-btn {
+      min-height: 24px !important;
+      height: 24px !important;
+      padding-inline: 6px !important;
+      font-size: 0.75rem !important;
+    }
+  }
+
+  .edit-dialog-hero {
+    gap: 12px;
+
+    &__media {
+      max-width: 200px;
+    }
+  }
+
+  .edit-dialog-footer {
+    .v-btn {
+      min-height: var(--edit-deck-control-h);
+      font-size: 0.8125rem;
+    }
+  }
+}
+
+.edit-dialog-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgb(var(--v-theme-surface));
+  flex-shrink: 0;
+
+  &__dirty {
+    min-height: 20px;
+  }
+}
+
+.edit-pinned-overview {
+  &__surface {
+    border: 1px solid rgba(var(--v-theme-primary), 0.16);
+    border-radius: var(--edit-deck-radius, 16px);
+    background: rgba(var(--v-theme-primary), 0.03);
+    box-shadow:
+      0 1px 0 rgba(var(--v-theme-primary), 0.04),
+      0 8px 22px -16px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+  }
+
+  &__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 6px 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+
+    &:hover {
+      background: rgba(var(--v-theme-primary), 0.05);
+    }
+  }
+
+  &__toggle-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  &__chevron {
+    flex-shrink: 0;
+    opacity: 0.65;
+  }
+
+  &__toggle-title {
+    flex: 0 1 auto;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  &__toggle-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    opacity: 0.55;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__toggle-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    width: min(120px, 28%);
+
+    .v-progress-linear {
+      flex: 1 1 auto;
+    }
+  }
+
+  &--collapsed &__toggle-progress {
+    width: min(140px, 34%);
+  }
+
+  &__body {
+    border-top: 1px solid rgba(var(--v-theme-primary), 0.1);
+  }
+
+  &__section {
+    padding: 8px 12px;
+
+    & + & {
+      border-top: 1px solid rgba(var(--v-theme-primary), 0.1);
+    }
+
+    &--progress {
+      padding-block: 6px 8px;
+    }
+  }
+
+  &__label {
+    font-size: 0.6875rem;
+    font-weight: 400;
+    line-height: 1.2;
+    opacity: 0.55;
+    margin-bottom: 4px;
+  }
+
+  &__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+  }
+
+  &__stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    min-height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(var(--v-theme-surface), 0.92);
+    border: 1px solid rgba(var(--v-theme-primary), 0.12);
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: rgba(var(--v-theme-on-surface), 0.82);
+
+    .v-icon {
+      opacity: 0.7;
+      flex-shrink: 0;
+    }
+  }
+
+  &__stat-label {
+    opacity: 0.62;
+    white-space: nowrap;
+  }
+
+  &__stat-value {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  &__progress-value {
+    flex: 0 0 auto;
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.7;
+    min-width: 2.25rem;
+    text-align: right;
+  }
+}
+
+.edit-dialog-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+
+  &__media {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 200px;
+    transition: max-width 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:has(.embedded-expanded) {
+      max-width: 100%;
+    }
+  }
+
+  &__overview {
+    flex: 1 1 280px;
+    min-width: 0;
+  }
+}
+
+.edit-dialog-media-panel {
+  &__card {
+    overflow: hidden;
+    // Vuetify's own .v-card rule sets border-width/color via longhand
+    // properties at equal specificity and loads after this file, so the
+    // shorthand `border` here loses the cascade without !important.
+    border: 1px solid rgba(var(--v-theme-primary), 0.16) !important;
+    border-radius: var(--edit-deck-radius, 16px) !important;
+    background: rgb(var(--v-theme-surface));
+    box-shadow:
+      0 1px 0 rgba(var(--v-theme-primary), 0.04),
+      0 8px 22px -16px rgba(0, 0, 0, 0.22);
+
+    &--video {
+      overflow: visible;
+    }
+  }
+
+  &__image-wrap,
+  &__image {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  &__image {
+    .v-img__img {
+      object-position: top center;
+    }
+  }
+
+  &__image-wrap {
+    position: relative;
+    background: rgb(var(--v-theme-surface-variant));
+
+    &--video {
+      max-height: none;
+      overflow: hidden;
+      transition: max-height 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  }
+
+  &__controls {
+    background: rgba(var(--v-theme-primary), 0.03);
+    border-top: 1px solid rgba(var(--v-theme-primary), 0.16);
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    background: transparent;
+  }
+
+  &__toolbar-label {
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    opacity: 0.55;
+    white-space: nowrap;
+  }
+
+  &__toolbar-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    .v-btn--icon.v-btn--size-small {
+      width: 30px;
+      height: 30px;
+    }
+  }
+
+  &__placeholder {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  &__thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 4px 6px 6px;
+    border-top: 1px solid rgba(var(--v-theme-primary), 0.1);
+    background: transparent;
+  }
+
+  &__thumb-opt {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    margin: 0;
+    min-width: 0;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(var(--v-theme-primary), 0.72);
+    font: inherit;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    text-transform: lowercase;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+
+    &:hover {
+      background: rgba(var(--v-theme-primary), 0.08);
+      color: rgb(var(--v-theme-primary));
+    }
+
+    &--exists:not(&--active) {
+      background: rgba(var(--v-theme-primary), 0.1);
+      color: rgb(var(--v-theme-primary));
+    }
+
+    &--missing:not(&--active) {
+      opacity: 0.48;
+    }
+
+    &--active {
+      background: rgb(var(--v-theme-primary));
+      color: rgb(var(--v-theme-on-primary));
+      opacity: 1;
+
+      &:hover {
+        background: rgb(var(--v-theme-primary));
+        color: rgb(var(--v-theme-on-primary));
+      }
+
+      .edit-dialog-media-panel__thumb-dot {
+        background: rgb(var(--v-theme-on-primary));
+      }
+    }
+  }
+
+  &__thumb-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgb(var(--v-theme-success));
+  }
+
+  &__thumb-opt--active .edit-dialog-media-panel__thumb-dot {
+    background: rgb(var(--v-theme-on-primary));
+  }
+
+  &__thumb-label {
+    min-width: 0;
+  }
+}
+
+.video-preview-host:not(.video-preview-host--embedded) {
+  position: relative;
+  // Contain nested thumb z-index so card rating/favorite overlays can sit above.
+  z-index: 0;
+  width: 100%;
+
+  .video-preview-host__anchor {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .video-preview-host__anchor-thumb {
+    width: 100%;
+    height: 100%;
+    // Layout placeholder only — hide so the sharp card twin doesn't
+    // sit under / beside the portaled expanding plate.
+    opacity: 0;
+  }
+
+  &:has(.video-preview-host__anchor) {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+.video-preview-host--embedded {
+  position: relative;
+  width: 100%;
+
+  .video-preview-host__anchor {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .video-preview-host__anchor-thumb {
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+  }
+
+  .embedded-play-hint {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.38);
+
+    .v-icon {
+      opacity: 0.92;
+      filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45));
+    }
+  }
+
+  .video-preview-container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    cursor: pointer;
+
+    .duration,
+    .resolution,
+    .progress {
+      display: none;
+    }
+
+    .thumb {
+      z-index: 1;
+      opacity: 1;
+    }
+
+    .preview-unavailable-notice {
+      z-index: 4;
+    }
+
+    .preview,
+    .timeline {
+      z-index: 2;
+      opacity: 1;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      left: 0;
+      top: 0;
+      background-color: transparent;
+      animation: none;
+    }
+
+    .timeline {
+      opacity: 0;
+      z-index: 2;
+      transition: opacity 320ms ease;
+      inset: -1px;
+      width: auto;
+      height: auto;
+    }
+
+
+    .preview video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background-color: transparent;
+      opacity: 0;
+      transition: opacity 520ms ease-in-out;
+    }
+
+    &.is-preview-active:not(.video-preview-container--expanded) {
+      .timeline {
+        opacity: 1;
+      }
+    }
+
+    /* Ready without pending: reveal video. Pending keeps thumb until seek settles. */
+    &.timeline-preview-active:not(.video-preview-container--expanded) {
+      .thumb {
+        pointer-events: none;
+        transform: none !important;
+        z-index: 1;
+      }
+
+      .timeline {
+        opacity: 1 !important;
+        z-index: 2;
+        pointer-events: auto;
+      }
+    }
+
+    &.is-hover-preview-ready:not(.is-hover-preview-pending):not(.video-preview-container--expanded) {
+      .thumb {
+        pointer-events: none;
+      }
+
+      .preview video {
+        opacity: 1;
+      }
+
+      .preview,
+      .timeline {
+        pointer-events: auto;
+      }
+    }
+
+    &.is-hover-preview-pending:not(.video-preview-container--expanded) {
+      .preview video {
+        opacity: 0;
+      }
+    }
+
+    &.video-preview-container--expanded {
+      .thumb {
+        z-index: auto;
+      }
+
+      .preview {
+        z-index: 1000;
+      }
+
+      .preview video {
+        opacity: 1 !important;
+      }
+    }
+  }
+}
+
+.video-preview-host--compact {
+  position: relative;
+  width: 100%;
+  border-radius: inherit;
+
+  .video-preview-host__anchor {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .video-preview-host__anchor-thumb {
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+  }
+
+  .video-preview-container {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    width: 100%;
+    cursor: pointer;
+    border-radius: inherit;
+
+    .duration,
+    .resolution,
+    .progress {
+      display: none;
+    }
+
+    .thumb {
+      z-index: 1;
+      opacity: 1;
+
+      .v-img__img {
+        object-fit: cover;
+      }
+
+      &.thumb--grid-frame {
+        .grid-sprite-frame {
+          width: 100%;
+          height: 100%;
+        }
+      }
+    }
+
+    .preview-unavailable-notice {
+      z-index: 4;
+    }
+
+    .preview,
+    .timeline {
+      z-index: 2;
+      opacity: 1;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      left: 0;
+      top: 0;
+      background-color: transparent;
+      animation: none;
+    }
+
+    .timeline {
+      opacity: 0;
+      z-index: 2;
+      transition: opacity 320ms ease;
+      inset: -1px;
+      width: auto;
+      height: auto;
+    }
+
+
+    .preview video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background-color: transparent;
+      opacity: 0;
+      transition: opacity 520ms ease-in-out;
+    }
+
+    &.is-preview-active:not(.video-preview-container--expanded) {
+      .timeline {
+        opacity: 1;
+      }
+    }
+
+    /* Ready without pending: reveal video. Pending keeps thumb until seek settles. */
+    &.is-hover-preview-ready:not(.is-hover-preview-pending):not(.video-preview-container--expanded) {
+      .thumb {
+        pointer-events: none;
+      }
+
+      .preview video {
+        opacity: 1;
+      }
+
+      .preview,
+      .timeline {
+        pointer-events: auto;
+      }
+    }
+
+    &.is-hover-preview-pending:not(.video-preview-container--expanded) {
+      .preview video {
+        opacity: 0;
+      }
+    }
+
+    &.video-preview-container--expanded {
+      .thumb {
+        z-index: auto;
+      }
+
+      .preview {
+        z-index: 1000;
+      }
+
+      .preview video {
+        opacity: 1 !important;
+      }
+    }
+  }
+}
+
+// tag page
+.tag-page-params {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.tag-page-param {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100%;
+  border-radius: 16px;
+  margin-right: 16px;
+  margin-bottom: 16px;
+  background: none !important;
+  backdrop-filter: blur(1px);
+  &__value,
+  &__title {
+    display: flex;
+    justify-content: space-between;
+    opacity: 0.8;
+    font-size: 14px !important;
+  }
+  &__value {
+    padding: 8px;
+    max-width: 300px;
+  }
+  &__title {
+    padding: 8px 12px;
+    .v-icon {
+      margin-left: 15px;
+      opacity: 0.8;
+      font-size: 22px !important;
+    }
+  }
+}
+
+@media (mobile and max-width: 480px) {
+  .item-menu-btn {
+    opacity: 1;
+  }
+}
+
+.no-file {
+  .thumb,
+  img,
+  .v-img__img {
+    filter: saturate(0.1) opacity(50%);
+  }
+}

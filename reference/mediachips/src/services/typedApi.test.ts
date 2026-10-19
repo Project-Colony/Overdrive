@@ -1,0 +1,500 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AxiosResponse } from 'axios'
+import { API_ROUTES } from '@shared/api/routes'
+
+vi.mock('./apiClient', () => ({
+  apiClient: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}))
+
+import { apiClient } from './apiClient'
+import { typedApi } from './typedApi'
+
+const mockGet = vi.mocked(apiClient.get)
+const mockPost = vi.mocked(apiClient.post)
+
+function mockAxiosResponse<T>(data: T): AxiosResponse<T> {
+  return { data, status: 200, statusText: 'OK', headers: {}, config: {} as AxiosResponse['config'] }
+}
+
+describe('typedApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('validates bootstrap media types', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse([
+      { id: 1, type: 'video', name: 'Videos' },
+    ]))
+
+    const response = await typedApi.getMediaTypes()
+
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.mediaType)
+    expect(response.data[0]?.id).toBe(1)
+  })
+
+  it('loads extended api modules on first extended call', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse({ total: 42, filesize: 1024 }))
+
+    const response = await typedApi.getMediaStats()
+
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.mediaGetStats)
+    expect(response.data.total).toBe(42)
+  })
+
+  it('validates saved filters list', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse([
+      { id: 7, name: 'My filter' },
+    ]))
+
+    const response = await typedApi.getSavedFilters()
+
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.savedFilter)
+    expect(response.data[0]?.name).toBe('My filter')
+  })
+
+  it('validates task file list', async () => {
+    mockPost.mockResolvedValue(mockAxiosResponse({
+      files: ['/videos/a.mp4'],
+      skippedZips: [],
+    }))
+
+    const response = await typedApi.getFileList({ path: '/videos' })
+
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.taskGetFileList, { path: '/videos' })
+    expect(response.data).toEqual({
+      files: ['/videos/a.mp4'],
+      skippedZips: [],
+    })
+  })
+
+  it('lists browse places and directories through typed routes', async () => {
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      places: [{id: 'home', path: '/home', name: 'Home', icon: 'home'}],
+      container: false,
+    }))
+    const places = await typedApi.listBrowsePlaces()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.browsePlaces, {timeout: 5000})
+    expect(places.data.places[0]?.id).toBe('home')
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      currentPath: '/videos',
+      parentPath: '/',
+      rootPath: '/',
+      truncated: false,
+      platform: 'darwin',
+      entries: [{
+        name: 'a.mp4',
+        path: '/videos/a.mp4',
+        isDirectory: false,
+        size: 10,
+        mtimeMs: 1,
+        extension: 'mp4',
+        inLibrary: false,
+        addable: true,
+        mediaId: null,
+      }],
+    }))
+    const directory = await typedApi.listBrowseDirectory({path: '/videos'})
+    expect(mockPost).toHaveBeenCalledWith(
+      API_ROUTES.browseListDirectory,
+      {path: '/videos', extensions: undefined, showHidden: undefined},
+      {timeout: 10000},
+    )
+    expect(directory.data.entries[0]?.name).toBe('a.mp4')
+  })
+
+  it('loads generation and missing-media status through typed routes', async () => {
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      preview: {total: 10, pending: 2, generated: 8},
+      grid: {total: 10, pending: 1, generated: 9},
+      marks: {total: 5, pending: 0, generated: 5},
+    }))
+    const videoImages = await typedApi.getVideoImagesGenerationStatus()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.taskVideoImagesGenerationStatus)
+    expect(videoImages.data.preview?.pending).toBe(2)
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({total: 20, pending: 4, generated: 16}))
+    const thumbs = await typedApi.getImageThumbsGenerationStatus()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.taskImageThumbsGenerationStatus)
+    expect(thumbs.data.pending).toBe(4)
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      done: false,
+      pendingCount: 3,
+      byType: {main: 2},
+      downloadSizeMb: 50,
+      suggested: true,
+    }))
+    const upscale = await typedApi.getTagImageAiUpscaleStatus()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.taskTagImageAiUpscaleStatus)
+    expect(upscale.data.pendingCount).toBe(3)
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({total: 100, missing: 7, present: 93}))
+    const missing = await typedApi.getMissingMediaStatus({full: true})
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.taskMissingMediaStatus, {
+      params: {full: 'true'},
+    })
+    expect(missing.data.missing).toBe(7)
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({updated: 2}))
+    const relinked = await typedApi.relinkMissingMedia({matches: [{id: 1}, {id: 2}]})
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.taskRelinkMissingMedia, {
+      matches: [{id: 1}, {id: 2}],
+    })
+    expect(relinked.data.updated).toBe(2)
+  })
+
+  it('searches scrapers and tmdb through typed routes', async () => {
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      data: [{slug: 'alice', posters: []}],
+    }))
+    const performers = await typedApi.searchScraperPerformers({q: 'alice'})
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.scraperSearchPerformers, {
+      params: {q: 'alice'},
+    })
+    expect(performers.data.data?.[0]?.slug).toBe('alice')
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      data: [{id: 'scene-1', title: 'Demo'}],
+      matchMethod: 'search',
+    }))
+    const scenes = await typedApi.searchScraperScenes({query: 'demo', limit: 10})
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.scraperSearchScenes, {
+      query: 'demo',
+      limit: 10,
+    })
+    expect(scenes.data.data?.[0]?.id).toBe('scene-1')
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({configured: true}))
+    const status = await typedApi.getTmdbStatus()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.tmdbStatus)
+    expect(status.data.configured).toBe(true)
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      results: [{
+        id: 9,
+        mediaType: 'movie',
+        title: 'Demo Movie',
+        originalTitle: null,
+        overview: null,
+        releaseDate: null,
+        posterUrl: null,
+        voteAverage: null,
+      }],
+    }))
+    const movies = await typedApi.searchTmdbMovies({query: 'Demo'})
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.tmdbSearch, {query: 'Demo'})
+    expect(movies.data.results[0]?.title).toBe('Demo Movie')
+  })
+
+  it('pings and loads server config through typed routes', async () => {
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      pong: 1,
+      message: 'Server is online',
+    }))
+    const ping = await typedApi.ping()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.ping, {})
+    expect(ping.data.message).toBe('Server is online')
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      appVersion: '1.5.0',
+      path: '/data',
+      databases: [],
+    }))
+    const config = await typedApi.getServerConfig()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.config, {})
+    expect(config.data.appVersion).toBe('1.5.0')
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse('abcdef0123456789'))
+    const machineId = await typedApi.getMachineId()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.getMachineId, {})
+    expect(machineId.data).toBe('abcdef0123456789')
+  })
+
+  it('lists media-server libraries through typed routes', async () => {
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      ok: true,
+      libraries: [{id: '1', name: 'Movies'}],
+    }))
+    const jellyfin = await typedApi.listMediaServerLibraries('jellyfin', {
+      baseUrl: 'http://jellyfin.local',
+      apiKey: 'key',
+    })
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.jellyfinListLibraries, {
+      baseUrl: 'http://jellyfin.local',
+      apiKey: 'key',
+    })
+    expect(jellyfin.data.libraries?.[0]?.name).toBe('Movies')
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      ok: true,
+      libraries: [{id: '2', name: 'TV'}],
+    }))
+    const plex = await typedApi.listMediaServerLibraries('plex', {
+      baseUrl: 'http://plex.local',
+      token: 'token',
+    })
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.plexListLibraries, {
+      baseUrl: 'http://plex.local',
+      token: 'token',
+    })
+    expect(plex.data.libraries?.[0]?.id).toBe('2')
+  })
+
+  it('reads backfill status through typed routes', async () => {
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      total: 10,
+      pending: 3,
+      hashed: 7,
+    }))
+    const fingerprint = await typedApi.getBackfillStatus('fingerprint')
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.taskFingerprintBackfillStatus)
+    expect(fingerprint.data.pending).toBe(3)
+    expect(fingerprint.data.hashed).toBe(7)
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      total: 8,
+      pending: 2,
+      filled: 6,
+    }))
+    const codec = await typedApi.getBackfillStatus('videoCodec')
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.taskVideoCodecBackfillStatus)
+    expect(codec.data.filled).toBe(6)
+  })
+
+  it('reads and updates Local AI status through typed routes', async () => {
+    mockGet.mockResolvedValueOnce(mockAxiosResponse({
+      status: 'downloaded',
+      enabled: true,
+      sizeMb: 1066,
+      filename: 'model.gguf',
+    }))
+    const status = await typedApi.getLocalAiStatus()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.taskLocalAiStatus)
+    expect(status.data.status).toBe('downloaded')
+    expect(status.data.enabled).toBe(true)
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      status: 'disabled',
+      enabled: false,
+      sizeMb: 1066,
+    }))
+    const updated = await typedApi.setLocalAiEnabled(false)
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.taskSetLocalAiEnabled, {enabled: false})
+    expect(updated.data.enabled).toBe(false)
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      deleted: true,
+      status: {status: 'not_downloaded', enabled: false, sizeMb: 1066},
+    }))
+    const deleted = await typedApi.deleteLocalAiModel()
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.taskDeleteLocalAi, {})
+    expect(deleted.data.deleted).toBe(true)
+    expect(deleted.data.status.status).toBe('not_downloaded')
+  })
+
+  it('lists and installs plugins through typed routes', async () => {
+    const entry = {
+      manifest: {
+        id: 'mediachips.demo',
+        name: 'Demo',
+        version: '1.0.0',
+        engines: {mediachips: '>=1.0.0'},
+        permissions: [],
+      },
+      source: 'user' as const,
+      state: 'installed' as const,
+      enabled: true,
+    }
+
+    mockGet.mockResolvedValueOnce(mockAxiosResponse([entry]))
+    const list = await typedApi.listPlugins(['mediachips.demo'])
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.plugin, {
+      params: {enabledPlugins: JSON.stringify(['mediachips.demo'])},
+    })
+    expect(list.data[0]?.manifest.id).toBe('mediachips.demo')
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse(entry))
+    const installed = await typedApi.installPlugin('/tmp/plugin.zip')
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.pluginInstall, {path: '/tmp/plugin.zip'})
+    expect(installed.data.manifest.id).toBe('mediachips.demo')
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({ok: true as const}))
+    const uninstalled = await typedApi.uninstallPlugin('mediachips.demo')
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.pluginUninstall, {id: 'mediachips.demo'})
+    expect(uninstalled.data).toEqual({ok: true})
+  })
+
+  it('falls back when bootstrap validation fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockGet.mockResolvedValue(mockAxiosResponse([{ id: 'invalid' }]))
+
+    const response = await typedApi.getMediaTypes()
+
+    expect(warn).toHaveBeenCalled()
+    expect(response.data[0]?.id).toBe('invalid')
+    warn.mockRestore()
+  })
+
+  it('validates page settings fetch tuple', async () => {
+    mockPost.mockResolvedValue(mockAxiosResponse([
+      { page: 1, limit: 24 },
+      true,
+    ]))
+
+    const response = await typedApi.fetchPageSettings({ mediaTypeId: 1 })
+
+    expect(mockPost).toHaveBeenCalledWith(API_ROUTES.pageSetting, { mediaTypeId: 1 })
+    expect(response.data[0]?.page).toBe(1)
+    expect(response.data[1]).toBe(true)
+  })
+
+  it('validates playlist create response', async () => {
+    mockPost.mockResolvedValue(mockAxiosResponse({ id: 9, name: 'New list' }))
+
+    const response = await typedApi.createPlaylist({ name: 'New list' })
+
+    expect(response.data.id).toBe(9)
+    expect(response.data.name).toBe('New list')
+  })
+
+  it('validates playlist media links', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse([
+      { mediaId: 10, playlistId: 2, order: 1 },
+    ]))
+
+    const response = await typedApi.getMediaInPlaylist(2)
+
+    expect(response.data[0]?.mediaId).toBe(10)
+  })
+
+  it('validates meta by id', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse({ id: 3, name: 'Studio', type: 'array' }))
+
+    const response = await typedApi.getMetaById(3)
+
+    expect(response.data.name).toBe('Studio')
+  })
+
+  it('validates marks for video', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse([{ id: 1, type: 'meta', time: 30, mediaId: 5 }]))
+
+    const response = await typedApi.getMarksForVideo(5)
+
+    expect(response.data[0]?.time).toBe(30)
+  })
+
+  it('validates create mark response', async () => {
+    mockPost.mockResolvedValue(mockAxiosResponse({ id: 9, type: 'favorite', time: 12, mediaId: 5 }))
+
+    const response = await typedApi.createMark({ type: 'favorite', time: 12, mediaId: 5 })
+
+    expect(response.data.id).toBe(9)
+    expect(response.data.type).toBe('favorite')
+  })
+
+  it('validates create meta and setting write responses', async () => {
+    mockPost.mockResolvedValue(mockAxiosResponse({ id: 8, name: 'Studio', type: 'array' }))
+    const meta = await typedApi.createMeta({ name: 'Studio', type: 'array' })
+    expect(meta.data.id).toBe(8)
+
+    mockGet.mockResolvedValue(mockAxiosResponse({ option: 'theme', value: 'dark' }))
+    const setting = await typedApi.getSetting('theme')
+    expect(setting.data.value).toBe('dark')
+  })
+
+  it('validates database sizes and watched folders', async () => {
+    mockPost.mockResolvedValue(mockAxiosResponse({ sizes: { main: 4096 } }))
+    const sizes = await typedApi.getDatabaseSizes({ ids: ['main'] })
+    expect(sizes.data.sizes?.main).toBe(4096)
+
+    mockGet.mockResolvedValue(mockAxiosResponse([
+      {
+        folderId: 1,
+        mediaType: { id: 2, type: 'video' },
+        watchedFolder: { path: '/videos' },
+      },
+    ]))
+    const folders = await typedApi.getMediaTypesInWatchedFolders()
+    expect(folders.data[0]?.folderId).toBe(1)
+  })
+
+  it('validates search media by path and add media', async () => {
+    mockPost.mockResolvedValueOnce(mockAxiosResponse([
+      { id: 3, path: '/media/clip.mp4' },
+    ]))
+    const search = await typedApi.searchMediaByPath({ query: 'clip' })
+    expect(search.data[0]?.id).toBe(3)
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({ id: 99, name: 'clip.mp4' }))
+    const added = await typedApi.addMedia({ path: '/media/clip.mp4' })
+    expect(added.data.id).toBe(99)
+  })
+
+  it('validates parse path tags', async () => {
+    mockPost.mockResolvedValue(mockAxiosResponse([
+      { mediaId: 4, tagId: 9, metaId: 2 },
+    ]))
+
+    const response = await typedApi.parsePathTags({ paths: [{ path: '/a.mp4', mediaId: 4 }] })
+    expect(response.data[0]?.tagId).toBe(9)
+  })
+
+  it('validates meta setting and sql search rows', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse({ isLink: true, ratingMax: 10 }))
+    const setting = await typedApi.getMetaSetting(5)
+    expect(setting.data.isLink).toBe(true)
+    expect(setting.data.ratingMax).toBe(10)
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      items: [{ id: 1, name: 'clip.mp4', mediaTypeId: 2, path: '/clip.mp4' }],
+    }))
+    const media = await typedApi.searchMedia({ q: 'clip' })
+    expect(media.data[0]?.name).toBe('clip.mp4')
+    expect(media.data[0]?.mediaTypeId).toBe(2)
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      items: [{
+        id: 3,
+        name: 'Actor',
+        metaId: 1,
+      }],
+    }))
+    const tags = await typedApi.searchTags({ q: 'Actor' })
+    expect(tags.data[0]?.metaId).toBe(1)
+    expect(tags.data[0]?.name).toBe('Actor')
+
+    mockPost.mockResolvedValueOnce(mockAxiosResponse({
+      media: [{ id: 1, name: 'clip.mp4', mediaTypeId: 2, path: '/clip.mp4' }],
+      tags: [{ id: 3, name: 'Actor', metaId: 1 }],
+    }))
+    const combined = await typedApi.searchGlobal({ q: 'clip' })
+    expect(combined.data.media[0]?.name).toBe('clip.mp4')
+    expect(combined.data.tags[0]?.name).toBe('Actor')
+  })
+
+  it('validates video playable info', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse({
+      mode: 'stream',
+      transcodeRequired: true,
+      streamPlayback: true,
+    }))
+
+    const response = await typedApi.getVideoPlayable(12)
+    expect(mockGet).toHaveBeenCalledWith('/api/video/12/playable')
+    expect(response.data.transcodeRequired).toBe(true)
+  })
+
+  it('validates transcode cache stats', async () => {
+    mockGet.mockResolvedValue(mockAxiosResponse({ bytes: 4096, files: 2, entries: 2 }))
+
+    const response = await typedApi.getTranscodeCacheStats()
+    expect(mockGet).toHaveBeenCalledWith(API_ROUTES.transcodeCache)
+    expect(response.data.bytes).toBe(4096)
+  })
+})

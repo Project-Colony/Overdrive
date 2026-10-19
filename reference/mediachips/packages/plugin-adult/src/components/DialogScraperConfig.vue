@@ -1,0 +1,406 @@
+<template>
+  <v-dialog
+    v-model="dialogOpen"
+    :fullscreen="xs"
+    max-width="800"
+    scrollable
+    activator="parent"
+    @update:model-value="onDialogToggle"
+  >
+    <template v-slot:default="{ isActive }">
+      <v-card rounded="xl">
+        <DialogHeader
+          @close="isActive.value = false"
+          :header="t('scraper.setup')"
+          closable
+        />
+
+        <v-card-text class="pa-4">
+          <v-alert type="info"
+            density="comfortable"
+            variant="tonal"
+            rounded="xl"
+            class="text-caption mb-4">
+            {{ t('scraper.drag_meta_hint') }}
+          </v-alert>
+
+          <div
+            v-if="showCreateFieldsButton"
+            class="d-flex flex-wrap align-center justify-space-between ga-3 mb-4"
+          >
+            <div class="text-body-2 text-medium-emphasis">
+              {{ t('settings_labels.tools.create_performer_meta_hint') }}
+            </div>
+            <v-btn
+              :loading="creatingFields"
+              color="primary"
+              rounded="xl"
+              size="small"
+              variant="flat"
+              prepend-icon="mdi-auto-fix"
+              @click="confirmCreateFields"
+            >
+              {{ t('settings_labels.tools.create_performer_meta') }}
+            </v-btn>
+          </div>
+
+          <div class="text-subtitle-2 font-weight-medium mb-2">{{ t('scraper.pinned_meta') }}</div>
+
+          <div v-if="pinnedMetasFree.length"
+            class="d-flex flex-wrap">
+            <div
+              v-for="cm in pinnedMetasFree"
+              :key="cm.pinnedMetaId ?? cm.id"
+              @dragstart="handleDragStart(cm, $event)"
+              @dragend="handleDragEnd"
+              draggable="true"
+              class="ma-1"
+              :style="{cursor: dragging ? 'grabbing' : 'grab'}"
+            >
+              <v-chip
+                size="small"
+                label
+                :prepend-icon="`mdi-${cm.meta?.icon}`"
+                :append-icon="getIconDataType(cm.meta?.type || '')"
+              >
+                {{ getMetaName(cm.meta, t) }}
+              </v-chip>
+            </div>
+          </div>
+
+          <v-alert v-else-if="pinnedMetas.length"
+            type="success"
+            rounded="xl"
+            variant="tonal"
+            class="text-caption">
+            {{ t('scraper.no_more_meta_added') }}
+          </v-alert>
+
+          <v-alert v-else
+            type="warning"
+            rounded="xl"
+            variant="tonal"
+            class="text-caption">
+            {{ t('scraper.no_pinned_meta') }}
+          </v-alert>
+
+          <v-divider class="my-4"></v-divider>
+
+          <!-- Right column -->
+          <div class="text-subtitle-2 font-weight-medium mb-2">{{ t('scraper.fields_title') }}</div>
+
+          <div class="d-flex flex-wrap">
+            <div
+              v-for="(field, index) in scraperFields"
+              :key="field.key || index"
+              @dragover.prevent="handleDragover(field, $event)"
+              @drop="handleDrop(field, index, $event)"
+              :class="[{
+                allowed: dragging === field.type,
+                assigned: field.meta
+              }]"
+              class="data-field ma-1"
+            >
+              <!-- Field assigned -->
+              <div
+                v-if="field.meta"
+                class="d-flex justify-space-between align-center"
+              >
+                <span class="text-body-1 mr-2">{{ getScraperFieldName(field) }}</span>
+
+                <v-chip
+                  size="small"
+                  label
+                  class="px-2"
+                  @click="remove(field.meta)"
+                  :prepend-icon="`mdi-${field.meta.meta?.icon}`"
+                >
+                  {{ getMetaName(field.meta.meta, t) }}
+                  <span class="text-caption text-medium-emphasis pl-2">
+                  {{ getMetaTypeName(field.type) }}
+                </span>
+                </v-chip>
+              </div>
+
+              <!-- Field empty -->
+              <div v-else
+                class="d-flex justify-space-between align-center px-1">
+              <span class="text-medium-emphasis text-body-1 mr-2">
+                {{ getScraperFieldName(field) }}
+              </span>
+                <span class="text-medium-emphasis text-caption">
+                {{ getMetaTypeName(field.type) }}
+              </span>
+              </div>
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+    </template>
+  </v-dialog>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue'
+import type {PropType} from 'vue'
+import {useDisplay} from 'vuetify'
+import {useI18n} from 'vue-i18n'
+import {typedApi} from '@/services/typedApi'
+import sortBy from 'lodash/sortBy'
+import {getIconDataType} from '@/services/metaTypeUtils'
+import DialogHeader from "@/components/elements/DialogHeader.vue";
+import ScraperFields from "../assets/ScraperFields";
+import {getMetaName} from "@/utils/metaI18n";
+import {useEventBus} from '@/utils/eventBus'
+import {reloadMetaCatalog} from '@/composable/metaCatalog'
+import {useNotificationsStore} from '@/stores/notifications'
+import {ensurePerformerScraperMeta} from '../services/ensurePerformerScraperMeta'
+import type {AssignedMeta, Meta} from '@/types/stores'
+
+interface ScraperFieldTemplate {
+  name: string
+  type: string
+  key: string
+}
+
+interface ScraperField extends ScraperFieldTemplate {
+  meta?: AssignedMeta | null
+}
+
+const props = defineProps({
+  meta: {
+    type: Object as PropType<Meta | null>,
+    default: null,
+  },
+  mediaTypeId: {
+    type: Number as PropType<number | null>,
+    default: null,
+  },
+})
+
+const emit = defineEmits<{
+  close: []
+  created: [meta: Meta]
+}>()
+
+const {xs} = useDisplay()
+const {t} = useI18n()
+const eventBus = useEventBus()
+const notificationsStore = useNotificationsStore()
+
+const dialogOpen = ref(false)
+const creatingFields = ref(false)
+const localMetaId = ref<number | null>(null)
+const pinnedMetas = ref<AssignedMeta[]>([])
+const pinnedMetasFree = ref<AssignedMeta[]>([])
+const dragging = ref<string | null>(null)
+const scraperFields = ref<ScraperField[]>([])
+const draggedMeta = ref<AssignedMeta | null>(null)
+
+const effectiveMetaId = computed(() => {
+  const fromProps = Number(props.meta?.id)
+  if (Number.isFinite(fromProps) && fromProps > 0) return fromProps
+  return localMetaId.value
+})
+
+const mappedFieldCount = computed(() =>
+  scraperFields.value.filter((field) => Boolean(field.meta)).length,
+)
+
+const showCreateFieldsButton = computed(() =>
+  !effectiveMetaId.value || mappedFieldCount.value < scraperFields.value.length,
+)
+
+const getScraperFieldName = (field: ScraperFieldTemplate) => t(`scraper.fields.${field.key}`, field.name)
+
+const getMetaTypeName = (type: string) => t(`meta.types.${type}`, type)
+
+function translateWithFallback(key: string, fallback?: string) {
+  const translated = t(key)
+  return translated === key && fallback ? fallback : translated
+}
+
+function onDialogToggle(open: boolean) {
+  dialogOpen.value = open
+  if (open) {
+    void updateScraperFields()
+  }
+}
+
+async function confirmCreateFields() {
+  const confirmed = window.confirm(t('settings_labels.tools.create_performer_meta_confirm'))
+  if (!confirmed) return
+
+  creatingFields.value = true
+  try {
+    const result = await ensurePerformerScraperMeta({
+      parentMeta: props.meta || null,
+      mediaTypeId: props.mediaTypeId || null,
+      t: translateWithFallback,
+    })
+
+    localMetaId.value = Number(result.parentMeta.id)
+    void reloadMetaCatalog()
+    emit('created', result.parentMeta)
+    await updateScraperFields()
+
+    notificationsStore.setNotification({
+      type: 'success',
+      title: t('settings_labels.tools.create_performer_meta_done'),
+      text: t('settings_labels.tools.create_performer_meta_summary', {
+        created: result.createdFields,
+        mapped: result.mappedFields,
+      }),
+    })
+  } catch (error) {
+    console.error('Failed to create performer scraper meta:', error)
+    notificationsStore.setNotification({
+      type: 'error',
+      title: t('settings_labels.tools.create_performer_meta'),
+      text: t('settings_labels.tools.create_performer_meta_failed'),
+    })
+  } finally {
+    creatingFields.value = false
+  }
+}
+
+function handleDragStart(meta: AssignedMeta, event: DragEvent) {
+  dragging.value = meta.meta?.type || null
+  draggedMeta.value = meta
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    // Mark as internal UI drag so global file-drop handlers ignore it.
+    event.dataTransfer.setData('text/plain', String(meta.pinnedMetaId ?? meta.metaId ?? ''))
+  }
+}
+
+function handleDragEnd() {
+  dragging.value = null
+  draggedMeta.value = null
+}
+
+function handleDragover(field: ScraperField, event: DragEvent) {
+  if (field.meta || (draggedMeta.value && draggedMeta.value.meta?.type !== field.type)) {
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'none'
+  } else {
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+async function handleDrop(field: ScraperField, index: number, event: DragEvent) {
+  event.preventDefault()
+
+  if (!draggedMeta.value || field.meta || draggedMeta.value.meta?.type !== field.type) {
+    return
+  }
+
+  try {
+    await typedApi.updatePinnedMetaAssignment({
+      data: {scraper: field.key},
+      metaId: draggedMeta.value.metaId,
+      pinnedMetaId: draggedMeta.value.pinnedMetaId
+    })
+
+    await updateScraperFields()
+    dragging.value = null
+    draggedMeta.value = null
+  } catch (error) {
+    console.error('Error assigning scraper field:', error)
+  }
+}
+
+async function updateScraperFields() {
+  await getPinnedMeta()
+  scraperFields.value = (ScraperFields as ScraperFieldTemplate[]).map((field) => ({...field}))
+
+  for (const field of scraperFields.value) {
+    const found = pinnedMetas.value.find(i => i.scraper === field.key)
+    if (found) field.meta = found
+  }
+}
+
+async function remove(meta: AssignedMeta) {
+  try {
+    await typedApi.updatePinnedMetaAssignment({
+      data: {scraper: null},
+      metaId: meta.metaId,
+      pinnedMetaId: meta.pinnedMetaId
+    })
+
+    await updateScraperFields()
+  } catch (error) {
+    console.error('Error removing scraper field:', error)
+  }
+}
+
+async function getPinnedMeta() {
+  const metaId = Number(effectiveMetaId.value)
+  if (!Number.isFinite(metaId) || metaId <= 0) {
+    pinnedMetas.value = []
+    pinnedMetasFree.value = []
+    return
+  }
+
+  try {
+    const res = await typedApi.getPinnedChildMeta(metaId)
+
+    if (res.data?.length) {
+      pinnedMetas.value = sortBy(res.data, ['meta.name'])
+      pinnedMetasFree.value = pinnedMetas.value.filter(i => !i.scraper)
+    } else {
+      pinnedMetas.value = []
+      pinnedMetasFree.value = []
+    }
+  } catch (error) {
+    console.error('Error fetching pinned meta:', error)
+  }
+}
+
+watch(
+  () => props.meta?.id,
+  (id) => {
+    if (id) localMetaId.value = null
+    void updateScraperFields()
+  },
+)
+
+onMounted(() => {
+  updateScraperFields()
+})
+</script>
+
+<style scoped>
+.data-field {
+  border: 1px dashed #777;
+  border-radius: 5px;
+  margin-bottom: 5px;
+  transition: 0.3s all;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.data-field > div {
+  width: 100%;
+}
+
+.data-field.allowed {
+  background-color: rgba(37, 179, 37, 0.2);
+}
+
+.data-field.assigned {
+  background-color: rgba(37, 179, 37, 0.4);
+}
+
+.data-field .v-chip {
+  transition: 0.3s all;
+  cursor: pointer;
+}
+
+.data-field .v-chip:hover {
+  background-color: #e88484;
+}
+</style>

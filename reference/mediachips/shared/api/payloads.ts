@@ -1,0 +1,482 @@
+import type { FilterObject } from '../entities/filter'
+import type { MediaType } from '../entities/media'
+import type { ItemsListRequest, ParsePathTagEntry } from './responses'
+
+export interface TabCreatePayload {
+  name?: string
+  icon?: string
+  url?: string
+  tagId?: number | null
+  metaId?: number | null
+  mediaTypeId?: number | null
+  [key: string]: unknown
+}
+
+export type TabUpdatePayload = Partial<TabCreatePayload>
+
+export interface AddMediaPayload {
+  path: string
+  type?: string | number | MediaType
+  is_check_duplicates?: boolean
+  [key: string]: unknown
+}
+
+export interface AddMediaBulkPayload {
+  mode?: 'lite'
+  type: string | number | MediaType
+  files?: string[]
+  roots?: string[]
+  excluded?: string[]
+  expandZips?: boolean
+  [key: string]: unknown
+}
+
+export interface MediaTypeWritePayload {
+  name?: string
+  extensions?: string
+  icon?: string
+  hidden?: boolean | number
+  order?: number
+  custom?: boolean
+  [key: string]: unknown
+}
+
+export interface CreateTagPayload {
+  name: string
+  metaId?: number
+  parentTagId?: number | null
+  color?: string
+  synonyms?: string
+  [key: string]: unknown
+}
+
+export interface MergeTagsPayload {
+  metaId: number
+  survivorId: number
+  sourceIds: number[]
+}
+
+export interface MergeMediaPayload {
+  survivorId: number
+  sourceIds: number[]
+  with_file?: boolean
+}
+
+export interface MediaDuplicateGroupsPayload {
+  duplicates_by?: string
+  mediaTypeId?: number | string | null
+}
+
+export interface MoveTagsToCategoryPayload {
+  tagIds: number[]
+  targetMetaId: number
+  onConflict: 'merge' | 'abort'
+}
+
+export interface MergeCategoriesPayload {
+  survivorId: number
+  sourceIds: number[]
+}
+
+export interface DuplicateCategoryPayload {
+  id: number
+  name?: string | null
+}
+
+export interface DuplicateTagPayload {
+  id: number
+  name?: string | null
+}
+
+export interface ParsePathTagsPayload {
+  paths: Array<{ path?: string; mediaId: number }>
+}
+
+export type CreateTagsInMediaOnePayload = {
+  mediaId?: number
+  tagId?: number | string
+  metaId?: number | string
+  path?: string
+  data?: ParsePathTagEntry
+  [key: string]: unknown
+}
+
+export type CreateTagsInTagOnePayload = {
+  parentTagId: number
+  tagId: number
+  metaId: number
+}
+
+export interface FilterTagsPayload {
+  metaId?: number
+  page?: number
+  limit?: number
+  sortBy?: string
+  sortDir?: string
+  filters?: FilterObject[]
+  query?: string
+  [key: string]: unknown
+}
+
+export interface PostTagItemsPayload {
+  metaId?: number
+  tagId?: number
+  mediaId?: number
+  filters?: FilterObject[]
+  search?: string
+  query?: string
+  searchMode?: 'substring' | 'chars'
+  page?: number
+  limit?: number
+  skipTotals?: boolean
+  sortBy?: string
+  direction?: string
+  ids?: number[]
+  [key: string]: unknown
+}
+
+export interface PinMetaAssignmentPayload {
+  metaId: number
+  mediaTypeId: number
+  order?: number
+}
+
+export interface PinChildMetaPayload {
+  metaId: number
+  pinnedMetaId: number
+  order?: number
+}
+
+export interface MetaAssignmentOrderPayload {
+  metaId: number
+  mediaTypeId?: number
+  pinnedMetaId?: number
+  data: { order: number }
+}
+
+export interface MetaAssignmentUpdatePayload {
+  metaId?: number | null
+  mediaTypeId?: number | null
+  pinnedMetaId?: number | null
+  order?: number
+  show?: number | boolean
+  [key: string]: unknown
+}
+
+export interface CreateThumbPayload {
+  timestamp: number
+  inputPath: string
+  outputPath: string
+  width: number
+  overwrite?: boolean
+}
+
+export interface CreateImagePayload {
+  image: string
+  outputPath: string
+  url?: string | null
+  sizes?: unknown
+}
+
+export interface CreateMarkThumbPayload {
+  markId: number
+  inputPath?: string
+  outputPath?: string
+  [key: string]: unknown
+}
+
+export interface VideoPreviewTaskPayload {
+  id?: number
+  path?: string
+  input?: string
+  output?: string
+  width?: number
+  cols?: number
+  rows?: number
+  seekRatio?: number
+  [key: string]: unknown
+}
+
+export interface GetFileBlobPayload {
+  path?: string
+  url?: string
+  outside?: boolean
+  _t?: number
+  [key: string]: unknown
+}
+
+export interface GetFileListPayload {
+  path: string
+  [key: string]: unknown
+}
+
+export interface SearchMediaByPathPayload {
+  path?: string
+  query?: string
+  mediaTypeId?: number
+  [key: string]: unknown
+}
+
+export interface UpdateMediaMultiplePayload {
+  ids?: number[]
+  mediaFiles?: Array<{ id: number; path: string; [key: string]: unknown }>
+  data?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export interface DatabaseSizesPayload {
+  [key: string]: unknown
+}
+
+export interface DuplicateDbPayload {
+  id: string
+  name?: string
+  icon?: string
+  includeGeneratedCache?: boolean
+}
+
+export interface FolderSizePayload {
+  path?: string
+  folder?: string
+  [key: string]: unknown
+}
+
+export interface BackupNamePayload {
+  name?: string
+  path?: string
+  [key: string]: unknown
+}
+
+export interface CreateFilterRowPayload {
+  filter: FilterObject
+  filterId?: number | null
+  rowId?: number | null
+  savedFilterId?: number
+  [key: string]: unknown
+}
+
+export interface CreateSavedFilterPayload {
+  name: string
+  mediaTypeId?: number | null
+  metaId?: number | null
+  tagId?: number | null
+  tabId?: number | null
+  sortBy?: string | null
+  sortDir?: string | null
+  size?: number | null
+  view?: number | null
+  groupBy?: string | null
+  filtersJoin?: 'and' | 'or' | null
+  icon?: string | null
+  [key: string]: unknown
+}
+
+export type UpdateSavedFilterPayload = Partial<CreateSavedFilterPayload>
+
+export interface CreatePlaylistPayload {
+  name: string
+  [key: string]: unknown
+}
+
+export type UpdatePlaylistPayload = Partial<CreatePlaylistPayload> & Record<string, unknown>
+
+export interface DeleteMediaInPlaylistsPayload {
+  mediaId?: number
+  playlistId?: number
+  [key: string]: unknown
+}
+
+export interface MediaInPlaylistOrderPayload {
+  mediaId: number
+  playlistId: number
+  order: number
+  [key: string]: unknown
+}
+
+export interface VideoMetadataUpdatePayload {
+  mediaId?: number
+  [key: string]: unknown
+}
+
+export interface MediaPathUpdatePayload {
+  ids?: number[]
+  id?: number
+  path?: string
+  [key: string]: unknown
+}
+
+export interface MediaIdsRequestPayload {
+  metaId?: number
+  mediaTypeId?: number | null
+  filters?: FilterObject[]
+  sortBy?: string
+  [key: string]: unknown
+}
+
+export interface MarkItemsRequestPayload {
+  filters?: FilterObject[]
+  metaId?: number
+  clipsOnly?: boolean
+  [key: string]: unknown
+}
+
+export interface MarkClipsRequestPayload {
+  tagId?: number
+  markIds?: number[]
+  sort?: 'time' | 'shuffle' | 'selection'
+  countOnly?: boolean
+  limit?: number
+  offset?: number
+}
+
+export interface ExportMarkClipsRequestPayload {
+  markIds: number[]
+  outputPath?: string
+  sort?: 'time' | 'shuffle' | 'selection'
+  mode?: 'concat' | 'folder'
+}
+
+export interface BulkMetaApplyPayload {
+  itemType: 'media' | 'tag'
+  itemIds: Array<number | string>
+  changes?: Array<{
+    editType?: number | string
+    metaId?: number | string
+    metaType?: string
+    value?: unknown
+  }>
+  presetChanges?: Array<{
+    editType?: number | string
+    field?: string
+    value?: unknown
+  }>
+}
+
+export interface ConfigUpdatePayload {
+  [key: string]: unknown
+}
+
+export type MediaTypeLike = MediaType
+
+export interface TagItemsListRequest extends ItemsListRequest {
+  metaId: number
+  searchMode?: 'substring' | 'chars'
+}
+
+export interface MediaThumbsRequestPayload {
+  ids?: Array<number | string>
+  mediaType?: string
+}
+
+export interface TagThumbsRequestPayload {
+  metaId: number
+  ids?: Array<number | string>
+  types?: string[]
+}
+
+export interface SqlQueryPayload {
+  query: string
+  mediaTypeId?: number
+  metaId?: number
+  [key: string]: unknown
+}
+
+export type ConversionCodec = 'auto' | 'hevc' | 'h264'
+export type ConversionResolution = 'original' | 2160 | 1080 | 720 | 480
+export type ConversionQuality = 'economy' | 'balanced' | 'quality'
+export interface TestVideoSegmentPayload {
+  id: number
+  path: string
+  destination: string
+}
+
+export interface TestVideoSegmentResponse {
+  outputPath: string
+  durationSeconds: number
+}
+
+export interface TrimVideoPayload {
+  id: number
+  path: string
+  startSeconds: number
+  endSeconds: number
+}
+
+export interface TrimVideoJobResponse {
+  id: string
+  status: string
+  mediaId: number
+  originalPath: string
+  outputPath?: string
+  startSeconds: number
+  endSeconds: number
+  progress: number
+  fallback?: boolean
+  error?: string
+  createdAt: number
+}
+
+export interface TrimVideoDeleteOriginalPayload {
+  id: number
+  originalPath: string
+  trimmedPath: string
+}
+
+export interface TrimVideoDeleteOriginalResponse {
+  id: number
+  path: string
+  basename: string
+  name: string
+  ext: string
+  duration?: number
+  filesize?: number
+}
+
+export interface ConvertVideosPayload {
+  items: Array<{id: number; path: string}>
+  options: {
+    codec: ConversionCodec
+    resolution: ConversionResolution
+    quality: ConversionQuality
+    destination: string
+    deleteOriginal?: boolean
+  }
+}
+export interface ConversionJobResponse {
+  id: string
+  status: string
+  createdAt: number
+  items: Array<{id: number; path: string; status: string; progress: number; etaSeconds?: number; speed?: number; estimatedSizeBytes?: number; outputSizeBytes?: number; outputPath?: string; codec?: 'hevc' | 'h264'; fallback?: boolean; error?: string; warning?: string}>
+}
+
+export interface LibraryResetMediaPayload {
+  mediaTypeId: number | 'all'
+  permanent?: boolean
+  withFile?: boolean
+}
+
+export interface LibraryResetTagsPayload {
+  metaId: number | 'all'
+  permanent?: boolean
+}
+
+export interface LibraryResetCounts {
+  mediaByType: Record<number, number>
+  mediaTotal: number
+  tagsByMeta: Record<number, number>
+  tagsTotal: number
+}
+
+export interface LibraryResetStreamEvent {
+  type: 'progress' | 'complete' | 'error'
+  processed?: number
+  total?: number
+  deleted?: number
+  failed?: number
+  mediaDeleted?: number
+  tagsDeleted?: number
+  metaDeleted?: number
+  current?: string
+  message?: string
+  stopped?: boolean
+}

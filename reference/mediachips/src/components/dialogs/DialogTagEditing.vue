@@ -1,0 +1,623 @@
+<template>
+  <v-dialog
+    :model-value="dialogsStore.tagEditing.show"
+    :fullscreen="xs"
+    :width="xl ? 1400 : 1000"
+    scrollable
+    @update:model-value="onDialogVisibilityChange"
+  >
+    <v-card class="edit-dialog-card">
+      <DialogHeader
+        @close="requestClose"
+        :header="'Editing'"
+        :subheader="tag?.name"
+        :subheader-copy-text="tag?.name"
+        :buttons="buttons"
+        icon="pencil"
+        compact
+        closable
+      />
+
+      <v-card-text class="edit-dialog-card__body">
+        <EditPinnedMetaValues
+          v-if="tag && meta"
+          :key="`${tag.id}-${editReloadKey}`"
+          layout="hero"
+          @close="requestClose"
+          @dirty-change="formDirty = $event"
+          :tag="tag"
+          :meta="meta"
+          ref="editingComponent"
+        >
+          <template #media>
+            <div class="tag-edit-media">
+              <EditDialogMediaPanel
+                mode="tag"
+                :images="images"
+                :current-index="currentIndex"
+                @update:current-index="currentIndex = $event"
+                @edited="onImageEdited"
+              />
+              <TagEnrollmentQuality
+                v-if="tag?.id && meta?.id"
+                ref="enrollmentQualityRef"
+                class="tag-edit-media__quality"
+                :tag-id="Number(tag.id)"
+                :meta-id="Number(meta.id)"
+              />
+            </div>
+          </template>
+        </EditPinnedMetaValues>
+      </v-card-text>
+    </v-card>
+
+    <DialogConfirm
+      v-if="is_show_dialog_delete_confirm"
+      variant="delete"
+      :dialog="is_show_dialog_delete_confirm"
+      :text="t('media.move_to_trash_confirm')"
+      :check-box-text="t('actions.delete_permanently')"
+      :check-box="deletePermanently"
+      @update:check-box="deletePermanently = $event"
+      @delete="deleteTag"
+      @close="is_show_dialog_delete_confirm = false"
+    />
+
+    <DialogConfirm
+      v-if="is_show_unsaved_confirm"
+      variant="confirm"
+      :dialog="is_show_unsaved_confirm"
+      @confirm="forceClose"
+      @close="is_show_unsaved_confirm = false"
+      :text="t('editing.discard_unsaved_confirm')"
+    />
+  </v-dialog>
+</template>
+
+<script setup lang="ts">
+import {ref, computed, onMounted, onBeforeUnmount, shallowRef, nextTick, watch} from 'vue'
+import {useDisplay} from 'vuetify'
+import {useRouter} from 'vue-router'
+import {useI18n} from 'vue-i18n'
+import {useDialogsStore} from '@/stores/dialogs'
+import {useItemsStore} from '@/stores/items'
+import {useAppStore} from '@/stores/app'
+import {useScraperStore} from "@mediachips/plugin-adult/stores/scraper"
+import {useNotificationsStore} from "@/stores/notifications"
+import {isAdultUiAvailable} from '@/services/adultFeatures'
+import {isTmdbUiAvailable, isTmdbPersonCategory} from '@/services/tmdbFeatures'
+import {autoScrapeTmdbPersonTag} from '@mediachips/plugin-tmdb/services/tmdbPersonAutoScrape'
+import {typedApi} from '@/services/typedApi'
+import {checkFileExists} from '@/services/fileService'
+import {isThumbUnavailable, resolveTagThumbDisplayUrl} from '@/utils/thumbSource'
+import {refreshTagThumbDisplay} from '@/utils/tagThumbRefresh'
+import {checkCurrentPage, getUrlParam} from '@/services/routeService'
+import path from 'path-browserify'
+import DialogHeader from '@/components/elements/DialogHeader.vue'
+import EditPinnedMetaValues from '@/components/items/EditPinnedMetaValues.vue'
+import EditDialogMediaPanel from '@/components/items/EditDialogMediaPanel.vue'
+import TagEnrollmentQuality from '@/components/tags/TagEnrollmentQuality.vue'
+import {useEventBus} from "@/utils/eventBus"
+import {useItemsListSync} from '@/composable/itemsListSync'
+import {reloadTagsCatalog} from '@/composable/appCatalogs'
+import {refreshPageTag} from '@/composable/pageTagLayoutRemount'
+import {invalidateTagHoverCache} from '@/services/tagHoverCache'
+import DialogConfirm from "@/components/dialogs/DialogConfirm.vue"
+import type {ImageEditedPayload} from '@/components/dialogs/DialogImageEditing.vue'
+import {
+  TAG_AVATAR_SAVE_WIDTH,
+  TAG_HEADER_SAVE_WIDTH,
+  TAG_IMAGE_SAVE_WIDTH,
+} from '@shared/tagImages'
+
+interface TagImage {
+  type: string
+  path: string
+  src: string
+  aspectRatio: number
+  width: number
+  height: number
+  key: string
+  missing?: boolean
+}
+
+interface DialogHeaderButton {
+  icon?: string
+  text?: string
+  title?: string
+  color?: string
+  variant?: string
+  outlined?: boolean
+  order?: number
+  action?: () => void | Promise<void>
+}
+
+interface EditComponentInstance {
+  save?: () => Promise<boolean>
+  tryApplyAutoColorFromImage?: (color: string) => void
+  reload?: () => Promise<void>
+  isDirty?: () => boolean
+}
+
+const {xl, xs} = useDisplay()
+const router = useRouter()
+const dialogsStore = useDialogsStore()
+const itemsStore = useItemsStore()
+const store = useAppStore()
+const scraperStore = useScraperStore()
+const notificationsStore = useNotificationsStore()
+const eventBus = useEventBus()
+const listSync = useItemsListSync()
+const {t} = useI18n()
+
+const images = ref<TagImage[]>([])
+const buttons = ref<DialogHeaderButton[]>([])
+const debounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const is_show_dialog_delete_confirm = ref(false)
+const deletePermanently = ref(false)
+const is_show_unsaved_confirm = ref(false)
+const editingComponent = ref<EditComponentInstance | null>(null)
+const enrollmentQualityRef = ref<{
+  reload?: () => Promise<void>
+  applyResult?: (data: Record<string, unknown> | null) => void
+  beginRefresh?: () => void
+} | null>(null)
+const currentIndex = shallowRef(0)
+const editReloadKey = ref(0)
+const formDirty = ref(false)
+
+const tag = computed(() => dialogsStore.tagEditing.tag)
+const meta = computed(() => dialogsStore.tagEditing.meta)
+
+const isTagPage = computed(() => checkCurrentPage(router.currentRoute.value, 'tag'))
+
+const initButtons = () => {
+  buttons.value = [
+    {
+      icon: 'delete',
+      text: t('common.delete'),
+      color: 'error',
+      variant: 'flat',
+      action: () => {
+        deletePermanently.value = false
+        is_show_dialog_delete_confirm.value = true
+      }
+    }
+  ]
+
+  if (isAdultUiAvailable() && meta.value?.scraper) {
+    buttons.value.push({
+      icon: 'search-web',
+      text: t('actions.scrape_info'),
+      color: 'info',
+      variant: 'flat',
+      action: openScraper
+    })
+    buttons.value.push({
+      icon: 'face-recognition',
+      text: t('actions.camgirlfinder'),
+      color: 'info',
+      variant: 'tonal',
+      action: openCamGirlFinder
+    })
+    buttons.value.push({
+      icon: 'cloud-download',
+      text: t('actions.auto_scrape_info'),
+      color: 'info',
+      variant: 'tonal',
+      action: autoScrape
+    })
+  }
+
+  if (isTmdbUiAvailable() && isTmdbPersonCategory(meta.value)) {
+    buttons.value.push({
+      icon: 'movie-search-outline',
+      text: t('actions.tmdb_person'),
+      color: 'primary',
+      variant: 'flat',
+      action: openTmdbPersonScraper,
+    })
+    buttons.value.push({
+      icon: 'cloud-download',
+      text: t('actions.tmdb_person_auto'),
+      color: 'primary',
+      variant: 'tonal',
+      action: autoScrapeTmdbPerson,
+    })
+  }
+
+  buttons.value.push({
+    icon: 'content-save',
+    text: t('common.save'),
+    color: 'success',
+    variant: 'flat',
+    action: save,
+  })
+}
+
+const getImages = async ({cacheBust = false}: {cacheBust?: boolean} = {}) => {
+  images.value = []
+  if (!tag.value || !meta.value) return
+
+  const imageTypes = [
+    {type: 'main', aspectRatio: meta.value.imageAspectRatio || 1, width: TAG_IMAGE_SAVE_WIDTH},
+    {type: 'alt', aspectRatio: meta.value.imageAspectRatio || 1, width: TAG_IMAGE_SAVE_WIDTH},
+    {type: 'custom1', aspectRatio: meta.value.imageAspectRatio || 1, width: TAG_IMAGE_SAVE_WIDTH},
+    {type: 'custom2', aspectRatio: meta.value.imageAspectRatio || 1, width: TAG_IMAGE_SAVE_WIDTH},
+    {type: 'avatar', aspectRatio: 1, width: TAG_AVATAR_SAVE_WIDTH},
+    {type: 'header', aspectRatio: 2.3, width: TAG_HEADER_SAVE_WIDTH},
+  ]
+
+  for (const imgType of imageTypes) {
+    const fileName = `${tag.value.id}_${imgType.type}.jpg`
+    const imgPath = path.join(
+      store.dbPath,
+      'meta',
+      String(meta.value.id),
+      fileName,
+    )
+    const exists = await checkFileExists(imgPath)
+    const src = exists
+      ? resolveTagThumbDisplayUrl({
+          dbPath: store.dbPath,
+          metaId: meta.value.id,
+          tagId: tag.value.id,
+          type: imgType.type,
+          cacheBust,
+        })
+      : ''
+
+    // Always expose every slot (including avatar/header) so Edit/Add stays available
+    // even when the file was never created or was deleted.
+    images.value.push({
+      type: imgType.type,
+      path: imgPath,
+      src: src && !isThumbUnavailable(src) ? src : '',
+      aspectRatio: imgType.aspectRatio,
+      width: imgType.width,
+      height: Math.floor(imgType.width / imgType.aspectRatio),
+      key: `${imgType.type}-${tag.value.id}`,
+      missing: !exists || !src || isThumbUnavailable(src),
+    })
+  }
+
+  if (currentIndex.value >= images.value.length) {
+    currentIndex.value = 0
+  }
+}
+
+const onImageEdited = async (payload?: ImageEditedPayload) => {
+  if (tag.value && meta.value) {
+    refreshTagThumbDisplay(itemsStore, store.dbPath, meta.value.id, tag.value.id)
+  }
+  await getImages({cacheBust: true})
+
+  // Rebuild face references in DB for this person, then refresh quality UI.
+  if (tag.value?.id) {
+    enrollmentQualityRef.value?.beginRefresh?.()
+    try {
+      const response = await typedApi.enrollTagFaces({
+        tagId: Number(tag.value.id),
+        force: true,
+      })
+      const data = response.data as {
+        skipped?: boolean
+        quality?: Record<string, unknown> | null
+      } | undefined
+      if (data?.quality) {
+        enrollmentQualityRef.value?.applyResult?.(data.quality)
+      } else if (!data?.skipped) {
+        void enrollmentQualityRef.value?.reload?.()
+      } else {
+        enrollmentQualityRef.value?.applyResult?.(null)
+      }
+    } catch {
+      void enrollmentQualityRef.value?.reload?.()
+    }
+  } else {
+    void enrollmentQualityRef.value?.reload?.()
+  }
+
+  if (payload?.extractedColor) {
+    editingComponent.value?.tryApplyAutoColorFromImage?.(payload.extractedColor)
+  }
+  if (!tag.value || !meta.value) return
+  invalidateTagHoverCache(meta.value.id, tag.value.id)
+  listSync.getItemsFromDb({
+    ids: [tag.value.id],
+    type: 'tag'
+  })
+}
+
+const deleteTag = async () => {
+  if (!tag.value || !meta.value) return
+
+  const deletedTagId = tag.value.id
+  const deletedMetaId = meta.value.id
+  const deletedTagName = tag.value.name
+
+  try {
+    await typedApi.deleteEntityOne('tag', {
+      metaId: deletedMetaId,
+      id: deletedTagId,
+      permanent: deletePermanently.value,
+    })
+
+    invalidateTagHoverCache(deletedMetaId, deletedTagId)
+
+    if (itemsStore.type === 'media') {
+      const visibleIds = itemsStore.itemsOnPage.map((item) => item.id)
+      for (const itemId of visibleIds) {
+        itemsStore.removeTagFromItem({itemId, tagId: deletedTagId})
+      }
+    }
+
+    itemsStore.removeItem(deletedTagId)
+
+    listSync.removeEntitiesFromState({
+      ids: [deletedTagId],
+      type: 'tag',
+    })
+
+    await reloadTagsCatalog()
+
+    forceClose()
+
+    notificationsStore.setNotification({
+      type: 'info',
+      title: 'The tag has been deleted',
+      text: deletedTagName,
+    })
+
+    const routeTagId = getUrlParam(router.currentRoute.value, 'tagId')
+    const isDeletingCurrentPageTag = isTagPage.value
+      && routeTagId != null
+      && Number(routeTagId) === Number(deletedTagId)
+
+    if (isDeletingCurrentPageTag) {
+      await router.push(`/meta?metaId=${deletedMetaId}`)
+      await nextTick()
+    }
+
+    listSync.getItemsFromDb({type: 'tag'})
+  } catch (error) {
+    console.error('Error deleting tag:', error)
+  }
+}
+
+const save = async () => {
+  if (!editingComponent.value?.save) {
+    console.error('Component or method not available')
+    return
+  }
+
+  const saved = await editingComponent.value.save()
+  if (!saved) return
+
+  const savedTagId = tag.value?.id
+  const savedMetaId = meta.value?.id
+
+  if (savedMetaId != null && savedTagId != null) {
+    invalidateTagHoverCache(savedMetaId, savedTagId)
+  }
+
+  if (isTagPage.value) {
+    void refreshPageTag()
+  }
+
+  if (savedTagId != null) {
+    listSync.getItemsFromDb({ids: [savedTagId], type: 'tag'})
+  }
+
+  if (itemsStore.type === 'media') {
+    void reloadTagsCatalog()
+    const mediaIds = itemsStore.itemsOnPage.map((item) => item.id)
+    if (mediaIds.length) {
+      listSync.getItemsFromDb({ids: mediaIds, type: 'media'})
+    }
+  }
+
+  forceClose()
+}
+
+const forceClose = () => {
+  is_show_unsaved_confirm.value = false
+  formDirty.value = false
+  dialogsStore.tagEditing.show = false
+}
+
+const requestClose = () => {
+  if (formDirty.value || editingComponent.value?.isDirty?.()) {
+    is_show_unsaved_confirm.value = true
+    return
+  }
+  forceClose()
+}
+
+const onDialogVisibilityChange = (show: boolean) => {
+  if (show) {
+    dialogsStore.tagEditing.show = true
+    return
+  }
+  requestClose()
+}
+
+const openScraper = () => {
+  if (tag.value?.name) {
+    scraperStore.query = tag.value.name
+  }
+  dialogsStore.scraper.show = true
+}
+
+const openCamGirlFinder = () => {
+  if (!tag.value || !meta.value) return
+  dialogsStore.openCamGirlFinder({
+    query: tag.value.name || '',
+    tag: tag.value,
+    meta: meta.value,
+  })
+}
+
+const openTmdbPersonScraper = () => {
+  if (!tag.value || !meta.value) return
+  dialogsStore.tmdbPersonScraper.tag = {...tag.value}
+  dialogsStore.tmdbPersonScraper.meta = {...meta.value}
+  dialogsStore.tmdbPersonScraper.show = true
+}
+
+const refreshTagAfterScrape = async () => {
+  if (!tag.value || !meta.value) return
+  refreshTagThumbDisplay(itemsStore, store.dbPath, meta.value.id, tag.value.id)
+  invalidateTagHoverCache(meta.value.id, tag.value.id)
+  try {
+    const response = await typedApi.getTagById(tag.value.id)
+    if (response.data) {
+      dialogsStore.tagEditing.tag = response.data
+    }
+  } catch (error) {
+    console.error('Error refreshing tag after scrape:', error)
+  }
+  listSync.getItemsFromDb({ids: [tag.value.id], type: 'tag'})
+  if (isTagPage.value) {
+    void refreshPageTag()
+  }
+  editReloadKey.value += 1
+  getImages({cacheBust: true})
+}
+
+const autoScrape = async () => {
+  if (!tag.value || !meta.value) return
+
+  dialogsStore.process.show = true
+  dialogsStore.process.text = t('scraper.auto_scrape_in_progress', { name: tag.value.name || '' })
+
+  try {
+    const result = await scraperStore.autoScrapeTag({
+      tag: tag.value,
+      meta: meta.value,
+    })
+
+    if (result.success) {
+      notificationsStore.setNotification({
+        type: 'success',
+        title: t('scraper.auto_scrape_done'),
+        text: result.performerName || tag.value.name || '',
+      })
+      await refreshTagAfterScrape()
+    } else {
+      notificationsStore.setNotification({
+        type: result.error === 'not_found' ? 'warning' : 'error',
+        title: t('scraper.auto_scrape_failed'),
+        text: tag.value.name || '',
+      })
+    }
+  } finally {
+    dialogsStore.process.show = false
+    dialogsStore.process.text = null
+  }
+}
+
+const autoScrapeTmdbPerson = async () => {
+  if (!tag.value || !meta.value) return
+
+  dialogsStore.process.show = true
+  dialogsStore.process.text = t('tmdb.auto_scrape_in_progress', {name: tag.value.name || ''})
+
+  try {
+    const result = await autoScrapeTmdbPersonTag({
+      tag: tag.value,
+      meta: meta.value,
+      dbPath: store.dbPath,
+    })
+
+    if (result.success) {
+      notificationsStore.setNotification({
+        type: result.error === 'image_failed' ? 'warning' : 'success',
+        title: result.error === 'image_failed'
+          ? t('tmdb.auto_scrape_image_failed')
+          : t('tmdb.auto_scrape_done'),
+        text: result.personName || tag.value.name || '',
+      })
+      await refreshTagAfterScrape()
+    } else {
+      notificationsStore.setNotification({
+        type: result.error === 'not_found' ? 'warning' : 'error',
+        title: t('tmdb.auto_scrape_failed'),
+        text: tag.value.name || '',
+      })
+    }
+  } finally {
+    dialogsStore.process.show = false
+    dialogsStore.process.text = null
+  }
+}
+
+const handleScraperImages = () => {
+  if (tag.value && meta.value) {
+    refreshTagThumbDisplay(itemsStore, store.dbPath, meta.value.id, tag.value.id)
+    invalidateTagHoverCache(meta.value.id, tag.value.id)
+  }
+  getImages({cacheBust: true})
+  if (!tag.value) return
+  listSync.getItemsFromDb({ids: [tag.value.id], type: 'tag'})
+}
+
+const onSaveHotkey = (event: KeyboardEvent) => {
+  if (!dialogsStore.tagEditing.show) return
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return
+  event.preventDefault()
+  void save()
+}
+
+watch(
+  () => dialogsStore.tmdbPersonScraper.show,
+  async (show, wasShow) => {
+    if (wasShow && !show && tag.value && meta.value) {
+      invalidateTagHoverCache(meta.value.id, tag.value.id)
+      try {
+        const response = await typedApi.getTagById(tag.value.id)
+        if (response.data) {
+          dialogsStore.tagEditing.tag = response.data
+        }
+      } catch (error) {
+        console.error('Error refreshing tag after TMDB person scrape:', error)
+      }
+      listSync.getItemsFromDb({ids: [tag.value.id], type: 'tag'})
+      editReloadKey.value += 1
+      getImages({cacheBust: true})
+    }
+  },
+)
+
+watch(() => meta.value?.id, () => {
+  initButtons()
+})
+
+onMounted(() => {
+  initButtons()
+  getImages()
+
+  eventBus.on('scraperGotImages', handleScraperImages)
+  window.addEventListener('keydown', onSaveHotkey)
+})
+
+onBeforeUnmount(() => {
+  eventBus.off('scraperGotImages', handleScraperImages)
+  window.removeEventListener('keydown', onSaveHotkey)
+  if (debounceTimer.value) clearTimeout(debounceTimer.value)
+})
+</script>
+
+<style scoped>
+.tag-edit-media {
+  position: relative;
+}
+
+.tag-edit-media__quality {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 2;
+  margin-top: 0;
+}
+</style>

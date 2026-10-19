@@ -1,0 +1,333 @@
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+} from 'vue'
+import type {Handler} from 'mitt'
+import {getReadableDuration} from '@/services/formatUtils'
+import {mediaThumbKey, setCachedThumb} from '@/utils/thumbDisplayCache'
+import {
+  GRID_FRAME_INDEXES,
+  buildContainedThumbFallbackStyle,
+  buildGridSpriteSheetStyle,
+  buildGridSpriteViewportStyle,
+  buildStoryGridSpriteFrameStyle,
+  buildStoryThumbFallbackStyle,
+  getGridFramePercent,
+} from '@/utils/gridSprite'
+import {resolveGridSpriteDisplayUrl} from '@/utils/thumbSource'
+import {buildVideoGridTaskParams} from '@shared/videoPreview'
+import type {MediaItem} from '@/types/stores'
+
+export function getGridFrameDurationLabel(
+  frameIndex: number,
+  mediaDuration: number,
+  fallbackDurationLabel: string,
+): string {
+  if (!mediaDuration) {
+    return fallbackDurationLabel
+  }
+
+  const percent = getGridFramePercent(frameIndex)
+  return getReadableDuration(Math.floor(mediaDuration * percent / 100))
+}
+
+export function shouldShowFramesInProgressMessage(
+  isFileExists: boolean,
+  storyUsesThumbFallback: boolean,
+  isTaskRunning: boolean,
+): boolean {
+  return isFileExists && storyUsesThumbFallback && isTaskRunning
+}
+
+export function computeStoryScrollOffset(
+  layerX: number,
+  storyWidth: number,
+  wrapperWidth: number,
+): number | null {
+  if (wrapperWidth <= storyWidth) return null
+
+  const ratio = storyWidth / (wrapperWidth - storyWidth)
+  return Math.ceil(layerX / ratio)
+}
+
+export type ItemPreviewTimelineFramesOptions = {
+  media: MaybeRefOrGetter<MediaItem>
+  isFileExists: MaybeRefOrGetter<boolean>
+  isMounted: MaybeRefOrGetter<boolean>
+  isViewTimeline: MaybeRefOrGetter<boolean>
+  showTimelinePreview: MaybeRefOrGetter<boolean>
+  mediaDuration: MaybeRefOrGetter<number>
+  durationLabel: MaybeRefOrGetter<string>
+  mediaAspectRatio: MaybeRefOrGetter<number>
+  isTaskRunning: MaybeRefOrGetter<unknown>
+  mediaPath: MaybeRefOrGetter<string>
+  itemsView: MaybeRefOrGetter<number | string>
+  previewActive: MaybeRefOrGetter<boolean>
+  thumb: MaybeRefOrGetter<string | null | undefined>
+  resolveThumbFallback: () => string | null | undefined
+  getImg: () => Promise<void>
+  runImageProbe: (url: string) => Promise<boolean>
+  createGrid?: (input: string, output: string) => Promise<unknown>
+  getStoryEl: () => HTMLElement | null
+  getStoryWrapperEl: () => HTMLElement | null
+  onUpdateVideoFrames?: (handler: Handler) => void
+  offUpdateVideoFrames?: (handler: Handler) => void
+  onViewLeaveTimeline?: () => void
+}
+
+export function useItemPreviewTimelineFrames(options: ItemPreviewTimelineFramesOptions) {
+  const hoverFrameIndex = ref(0)
+  const gridSpriteUrl = ref<string | null>(null)
+  const storyUsesThumbFallback = ref(false)
+  const gridLoading = ref(false)
+
+  let initFramesToken = 0
+  let gridGenerationPromise: Promise<unknown> | null = null
+
+  const clearTimelineFrames = () => {
+    initFramesToken += 1
+    gridSpriteUrl.value = null
+    hoverFrameIndex.value = 0
+    storyUsesThumbFallback.value = false
+    gridLoading.value = false
+  }
+
+  const getGridFrameDuration = (frameIndex: number) =>
+    getGridFrameDurationLabel(
+      frameIndex,
+      toValue(options.mediaDuration),
+      toValue(options.durationLabel),
+    )
+
+  const hoverGridFrameStyle = computed(() => {
+    const thumbFallback = options.resolveThumbFallback()
+
+    if (storyUsesThumbFallback.value && thumbFallback) {
+      return buildContainedThumbFallbackStyle(thumbFallback, toValue(options.mediaAspectRatio))
+    }
+
+    if (!gridSpriteUrl.value) return null
+    return buildGridSpriteViewportStyle(toValue(options.mediaAspectRatio))
+  })
+
+  const hoverGridSheetStyle = computed(() => {
+    if (storyUsesThumbFallback.value || !gridSpriteUrl.value) return null
+    return buildGridSpriteSheetStyle(gridSpriteUrl.value, hoverFrameIndex.value)
+  })
+
+  const storyFrameStyles = computed(() => {
+    const spriteUrl = gridSpriteUrl.value
+    const thumbFallback = options.resolveThumbFallback()
+
+    return GRID_FRAME_INDEXES.map((frameIndex) => {
+      if (storyUsesThumbFallback.value && thumbFallback) {
+        return buildStoryThumbFallbackStyle(thumbFallback, toValue(options.mediaAspectRatio))
+      }
+
+      if (!spriteUrl) return null
+      return buildStoryGridSpriteFrameStyle(spriteUrl, frameIndex, toValue(options.mediaAspectRatio))
+    })
+  })
+
+  const isFrameLost = computed(() => !hoverGridFrameStyle.value)
+
+  const showFramesInProgressMessage = computed(() =>
+    shouldShowFramesInProgressMessage(
+      toValue(options.isFileExists),
+      storyUsesThumbFallback.value,
+      Boolean(toValue(options.isTaskRunning)),
+    ),
+  )
+
+  const setHoverFrameIndex = (frameIndex: number) => {
+    hoverFrameIndex.value = frameIndex
+  }
+
+  const scrollStory = (e: MouseEvent) => {
+    const storyEl = options.getStoryEl()
+    const wrapperEl = options.getStoryWrapperEl()
+    if (!storyEl || !wrapperEl) return
+
+    const offset = computeStoryScrollOffset(
+      e.layerX,
+      storyEl.clientWidth,
+      wrapperEl.clientWidth,
+    )
+    if (offset == null) return
+
+    wrapperEl.style.left = `-${offset}px`
+  }
+
+  const stopScrollStory = () => {
+    const wrapperEl = options.getStoryWrapperEl()
+    if (wrapperEl) {
+      wrapperEl.style.left = '0'
+    }
+  }
+
+  const ensureGridSpriteLoaded = async ({force = false}: {force?: boolean} = {}) => {
+    const media = toValue(options.media)
+    if (!media?.id) return false
+
+    const gridUrl = resolveGridSpriteDisplayUrl(toValue(options.mediaPath), media.id)
+    if (!gridUrl) {
+      storyUsesThumbFallback.value = true
+      gridSpriteUrl.value = null
+      return false
+    }
+
+    // Already painted this sprite — skip re-probe / createGrid (avoids flicker).
+    if (!force && gridSpriteUrl.value === gridUrl && !storyUsesThumbFallback.value) {
+      return true
+    }
+
+    gridLoading.value = true
+    try {
+      let hasGrid = await options.runImageProbe(gridUrl)
+      if (!hasGrid) {
+        // Keep a previously loaded sprite if a concurrent probe aborted/failed.
+        if (!force && gridSpriteUrl.value) {
+          storyUsesThumbFallback.value = false
+          return true
+        }
+        // Keep the poster visible while the on-demand grid is generated.
+        storyUsesThumbFallback.value = true
+        gridSpriteUrl.value = null
+      }
+      if (!hasGrid && options.createGrid && media.path && !gridGenerationPromise) {
+        gridGenerationPromise = options.createGrid(String(media.path), `${media.id}.jpg`)
+          .catch(() => undefined)
+          .finally(() => {
+            gridGenerationPromise = null
+          })
+        await gridGenerationPromise
+        hasGrid = await options.runImageProbe(gridUrl)
+      }
+      if (!hasGrid) {
+        if (!force && gridSpriteUrl.value) {
+          storyUsesThumbFallback.value = false
+          return true
+        }
+        storyUsesThumbFallback.value = true
+        gridSpriteUrl.value = null
+        return false
+      }
+
+      storyUsesThumbFallback.value = false
+      gridSpriteUrl.value = gridUrl
+      setCachedThumb(mediaThumbKey('videos', media.id, 'grids'), gridUrl)
+      return true
+    } finally {
+      gridLoading.value = false
+    }
+  }
+
+  const initFrames = async ({force = false}: {force?: boolean} = {}) => {
+    const token = ++initFramesToken
+    const timelineActive = toValue(options.isViewTimeline) || toValue(options.showTimelinePreview)
+    if (!toValue(options.isMounted) || !toValue(options.media)?.id || !timelineActive) {
+      return
+    }
+
+    // Sprite already ready — avoid getImg/probe churn from task/thumb watchers.
+    if (!force && gridSpriteUrl.value && !storyUsesThumbFallback.value) {
+      return
+    }
+
+    await options.getImg()
+    if (token !== initFramesToken || !(toValue(options.isViewTimeline) || toValue(options.showTimelinePreview))) return
+    await ensureGridSpriteLoaded({force})
+  }
+
+  const handleUpdateVideoFrames: Handler = (event) => {
+    const id = Number(event)
+    if (Number(toValue(options.media).id) === id && (toValue(options.isViewTimeline) || toValue(options.showTimelinePreview))) {
+      void initFrames({force: true})
+    }
+  }
+
+  watch(() => toValue(options.showTimelinePreview), (active) => {
+    if (active) {
+      void ensureGridSpriteLoaded()
+    }
+  })
+
+  // Eager-preview keeps previewActive true from first paint, so we cannot rely
+  // on a false→true edge. Re-run when mount / timeline / active become ready.
+  watch(
+    () => [
+      toValue(options.isMounted),
+      toValue(options.isViewTimeline),
+      toValue(options.showTimelinePreview),
+      toValue(options.previewActive),
+    ] as const,
+    ([mounted, viewTimeline, hoverTimeline, active], previous) => {
+      const timeline = viewTimeline || hoverTimeline
+      if (!active || !timeline) {
+        if (previous?.[3] && !active) {
+          clearTimelineFrames()
+        } else if (previous?.[1] && !viewTimeline && !hoverTimeline) {
+          initFramesToken += 1
+          options.onViewLeaveTimeline?.()
+        }
+        return
+      }
+
+      if (mounted) {
+        void initFrames()
+      }
+    },
+    {immediate: true},
+  )
+
+  watch(() => toValue(options.isTaskRunning), (running, wasRunning) => {
+    if (
+      wasRunning
+      && !running
+      && (toValue(options.isViewTimeline) || toValue(options.showTimelinePreview))
+      && (storyUsesThumbFallback.value || !gridSpriteUrl.value)
+    ) {
+      void initFrames()
+    }
+  })
+
+  watch(() => toValue(options.thumb), () => {
+    if (!(toValue(options.isViewTimeline) || toValue(options.showTimelinePreview))) return
+    if (!gridSpriteUrl.value && storyUsesThumbFallback.value) {
+      void initFrames()
+    }
+  })
+
+  onMounted(() => {
+    options.onUpdateVideoFrames?.(handleUpdateVideoFrames)
+  })
+
+  onBeforeUnmount(() => {
+    options.offUpdateVideoFrames?.(handleUpdateVideoFrames)
+    clearTimelineFrames()
+  })
+
+  return {
+    hoverFrameIndex,
+    gridSpriteUrl,
+    storyUsesThumbFallback,
+    gridLoading,
+    getGridFrameDuration,
+    hoverGridFrameStyle,
+    hoverGridSheetStyle,
+    storyFrameStyles,
+    isFrameLost,
+    showFramesInProgressMessage,
+    setHoverFrameIndex,
+    scrollStory,
+    stopScrollStory,
+    ensureGridSpriteLoaded,
+    initFrames,
+    clearTimelineFrames,
+  }
+}

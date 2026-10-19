@@ -1,0 +1,290 @@
+#!/usr/bin/env node
+import {cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from 'fs'
+import {spawnSync} from 'child_process'
+import {createRequire} from 'module'
+import {dirname, join} from 'path'
+import {fileURLToPath} from 'url'
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const require = createRequire(import.meta.url)
+const sfwBuild = String(process.env.MEDIA_CHIPS_SFW || '').trim() === '1'
+const msStoreBuild = String(process.env.MEDIA_CHIPS_MSSTORE || '').trim() === '1'
+
+/** Write only when content changes — avoids nodemon restart loops on unchanged flags. */
+function writeFileIfChanged(filePath, contents) {
+  try {
+    if (existsSync(filePath) && readFileSync(filePath, 'utf8') === contents) {
+      return false
+    }
+  } catch {
+    // fall through and write
+  }
+  writeFileSync(filePath, contents, 'utf8')
+  return true
+}
+
+/** Bake SFW into shared so packaged apps don't need MEDIA_CHIPS_SFW at runtime. */
+function syncSfwCompiledFlag() {
+  const filePath = join(root, 'shared/sfwCompiled.ts')
+  const contents = [
+    '/**',
+    ' * Overwritten by `scripts/compile.mjs` when MEDIA_CHIPS_SFW=1 (adult-strip channel).',
+    ' * Packaged Electron apps do not inherit that env var, so the flag must be baked in.',
+    ' */',
+    `export const SFW_COMPILED = ${sfwBuild ? 'true' : 'false'}`,
+    '',
+  ].join('\n')
+  writeFileIfChanged(filePath, contents)
+  if (sfwBuild) {
+    console.log('[compile] SFW_COMPILED=true (baked for packaged SFW / adult-strip runtime)')
+  }
+}
+
+/** Bake MS Store license bypass separately from SFW adult strip. */
+function syncMsStoreCompiledFlag() {
+  const filePath = join(root, 'shared/msStoreCompiled.ts')
+  const contents = [
+    '/**',
+    ' * Overwritten by `scripts/compile.mjs` when MEDIA_CHIPS_MSSTORE=1.',
+    ' * Packaged AppX does not inherit that env var, so the flag must be baked in.',
+    ' * Only Microsoft Store builds use this — not general SFW/smoke.',
+    ' */',
+    `export const MSSTORE_COMPILED = ${msStoreBuild ? 'true' : 'false'}`,
+    '',
+  ].join('\n')
+  writeFileIfChanged(filePath, contents)
+  if (msStoreBuild) {
+    console.log('[compile] MSSTORE_COMPILED=true (baked for Microsoft Store license bypass)')
+  }
+}
+
+const TARGETS = {
+  /** Emit-only legacy split builds (no source-tree copy-back). Prefer `backend`. */
+  shared: {
+    tsc: 'tsconfig.shared-build.json',
+  },
+  app: {
+    tsc: 'tsconfig.app.json',
+  },
+  api: {
+    tsc: sfwBuild ? 'tsconfig.api.sfw.json' : 'tsconfig.api.json',
+  },
+  /** Unified api+app+shared emit for running without source-tree copy-back. */
+  backend: {
+    tsc: sfwBuild ? 'tsconfig.backend.sfw.json' : 'tsconfig.backend.json',
+  },
+  electron: {
+    tsc: 'tsconfig.electron.json',
+    copy: () => {
+      copyJsFiles(join(root, '.electron-build/electron'), join(root, 'electron'))
+      // Preload runs outside runMain's Module rewrite and cannot resolve
+      // ../shared/... inside asar — bundle channel lists + drag helpers in.
+      bundleElectronPreload()
+    },
+  },
+  main: {
+    tsc: 'tsconfig.main.json',
+    copy: () => cpSync(join(root, '.main-build/main.js'), join(root, 'main.js')),
+  },
+  scripts: {
+    tsc: 'tsconfig.scripts.json',
+  },
+}
+
+function copyPluginServerArtifacts(buildRoot) {
+  const pluginIds = sfwBuild
+    ? ['plugin-tmdb']
+    : ['plugin-adult', 'plugin-stash', 'plugin-jellyfin', 'plugin-plex', 'plugin-emby', 'plugin-tmdb']
+  for (const pluginId of pluginIds) {
+    const serverOut = join(buildRoot, `packages/${pluginId}/src/server`)
+    if (existsSync(serverOut)) {
+      copyDirContents(serverOut, join(root, `packages/${pluginId}/src/server`))
+    }
+  }
+}
+
+/** Copy unified backend emit into source trees (Electron packaging / main.js require). */
+function copyBackendArtifacts() {
+  const buildRoot = join(root, '.backend-build')
+  copyDirContents(join(buildRoot, 'api'), join(root, 'api'))
+  copyDirContents(join(buildRoot, 'app'), join(root, 'app'))
+  copyDirContents(join(buildRoot, 'shared'), join(root, 'shared'))
+  copyPluginServerArtifacts(buildRoot)
+}
+
+function copyDirContents(srcDir, destDir) {
+  mkdirSync(destDir, {recursive: true})
+
+  for (const entry of readdirSync(srcDir, {withFileTypes: true})) {
+    const srcPath = join(srcDir, entry.name)
+    const destPath = join(destDir, entry.name)
+
+    if (entry.isDirectory()) {
+      copyDirContents(srcPath, destPath)
+      continue
+    }
+
+    cpSync(srcPath, destPath)
+  }
+}
+
+function copyJsFiles(srcDir, destDir) {
+  mkdirSync(destDir, {recursive: true})
+
+  for (const entry of readdirSync(srcDir, {withFileTypes: true})) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) {
+      continue
+    }
+
+    cpSync(join(srcDir, entry.name), join(destDir, entry.name))
+  }
+}
+
+/**
+ * Bundle electron/preload.ts into a single CJS file.
+ * Packaged preload cannot use runMain's `.backend-build` require rewrite.
+ *
+ * Use the JS API (not spawning `esbuild/bin/esbuild`): on Windows that path is
+ * not reliably executable via spawnSync without a shell, which broke `npm ci`.
+ */
+function bundleElectronPreload() {
+  let esbuild
+  try {
+    esbuild = require('esbuild')
+  } catch {
+    console.error('[compile] esbuild not found (expected via vite). Run npm install.')
+    process.exit(1)
+  }
+
+  const entry = join(root, 'electron/preload.ts')
+  const outfile = join(root, 'electron/preload.js')
+  try {
+    esbuild.buildSync({
+      entryPoints: [entry],
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      outfile,
+      external: ['electron'],
+      logLevel: 'warning',
+    })
+  } catch (error) {
+    console.error('[compile] Failed to bundle electron/preload.js')
+    console.error(error)
+    process.exit(1)
+  }
+
+  if (!existsSync(outfile)) {
+    console.error('[compile] Failed to bundle electron/preload.js (outfile missing)')
+    process.exit(1)
+  }
+}
+
+function runTsc(project) {
+  const result = spawnSync('npx', ['tsc', '-p', project], {
+    cwd: root,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  })
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1)
+  }
+}
+
+function runTarget(name) {
+  const target = TARGETS[name]
+  if (!target) {
+    console.error(`Unknown compile target: ${name}`)
+    console.error(
+      'Available:',
+      Object.keys(TARGETS).join(', '),
+      '+ groups: backend, backend-copy, dev-artifacts, electron-artifacts, artifacts',
+    )
+    process.exit(1)
+  }
+
+  runTsc(target.tsc)
+  target.copy?.()
+}
+
+async function runParallel(names) {
+  const {spawn} = await import('child_process')
+
+  await Promise.all(names.map((name) => new Promise((resolve, reject) => {
+    const target = TARGETS[name]
+    if (!target) {
+      reject(new Error(`Unknown compile target: ${name}`))
+      return
+    }
+
+    const child = spawn(process.execPath, [join(root, 'scripts/compile.mjs'), name], {
+      cwd: root,
+      stdio: 'inherit',
+    })
+
+    child.on('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`compile ${name} failed with exit code ${code}`))
+    })
+  })))
+}
+
+async function runGroup(name) {
+  switch (name) {
+    case 'backend':
+      // Emit to .backend-build only — no source-tree copy-back (DX for `npm run server`).
+      runTarget('backend')
+      return
+    case 'backend-copy':
+      // Optional legacy: copy .backend-build into api/app/shared for tooling that still
+      // expects source-tree JS. Packaged apps and daily DX use .backend-build directly.
+      runTarget('backend')
+      copyBackendArtifacts()
+      return
+    case 'dev-artifacts':
+      // Daily DX / postinstall: backend emit + Electron entrypoints, no api/app/shared copy-back.
+      runTarget('scripts')
+      runTarget('backend')
+      await runParallel(['electron', 'main'])
+      return
+    case 'electron-artifacts':
+      // Pack + electron-dev: emit backend to .backend-build; electron/main entrypoints only.
+      runTarget('backend')
+      await runParallel(['electron', 'main'])
+      return
+    case 'artifacts':
+      runTarget('scripts')
+      await runGroup('electron-artifacts')
+      return
+    default:
+      runTarget(name)
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2).filter((arg) => arg !== '--')
+
+  if (!args.length) {
+    console.error('Usage: node scripts/compile.mjs <target> [target...]')
+    console.error('       node scripts/compile.mjs --parallel <target> [target...]')
+    process.exit(1)
+  }
+
+  syncSfwCompiledFlag()
+  syncMsStoreCompiledFlag()
+
+  if (args[0] === '--parallel') {
+    await runParallel(args.slice(1))
+    return
+  }
+
+  for (const arg of args) {
+    await runGroup(arg)
+  }
+}
+
+main().catch((error) => {
+  console.error(error.message)
+  process.exit(1)
+})

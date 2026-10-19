@@ -1,0 +1,514 @@
+import type { JimpImage, ProcessAndSaveImageOptions } from '../types/imageMedia'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import {execFile} from 'child_process'
+import {promisify} from 'util'
+import exifr from 'exifr'
+import { Jimp } from 'jimp'
+import {getCenterCropRect, getDisplayDimensions} from './imageGeometry'
+import {writeFileAtomically} from './safeFileReplace'
+
+const execFileAsync = promisify(execFile)
+
+const THUMB_HEIGHT = 320
+const THUMB_JPEG_QUALITY = 85
+const VIEWER_JPEG_QUALITY = 82
+
+/**
+ * iPhone HEIC/Live Photo files often exceed libheif's default iref/item limits.
+ * `unlimited` disables those DoS caps so metadata (and decode, when the plugin
+ * can) works. See libvips heifload + Immich #29574.
+ */
+const SHARP_READ_OPTIONS = {
+  unlimited: true,
+  failOn: 'none' as const,
+  limitInputPixels: false,
+}
+
+async function getSharp() {
+  const {default: sharp} = await import('sharp')
+  return sharp
+}
+
+export function isHeicLikePath(filePath: string | null | undefined): boolean {
+  return /\.(heic|heif)$/i.test(String(filePath || ''))
+}
+
+/** Empty stubs (0-byte downloads) cannot produce metadata or thumbs. */
+export function assertNonEmptyImageSource(input: string | Buffer, label = 'image'): void {
+  if (Buffer.isBuffer(input)) {
+    if (input.length <= 0) {
+      throw new Error(`Empty ${label} buffer`)
+    }
+    return
+  }
+
+  const filePath = String(input || '')
+  if (!filePath) throw new Error(`Missing ${label} path`)
+  let size = 0
+  try {
+    size = fs.statSync(filePath).size
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw Object.assign(new Error(`Missing ${label} file: ${message}`), {cause: error})
+  }
+  if (size <= 0) {
+    throw new Error(`Empty ${label} file: ${filePath}`)
+  }
+}
+
+/**
+ * macOS Preview stack can decode iPhone HEIC that bundled libheif cannot.
+ * Returns a JPEG buffer suitable for sharp/jimp.
+ */
+async function rasterizeHeicWithSips(inputPath: string): Promise<Buffer> {
+  const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mc-heic-'))
+  const tmpJpg = path.join(tmpDir, 'raster.jpg')
+  try {
+    await execFileAsync('sips', ['-s', 'format', 'jpeg', inputPath, '--out', tmpJpg], {
+      timeout: 120_000,
+      maxBuffer: 32 * 1024 * 1024,
+    })
+    const buffer = await fs.promises.readFile(tmpJpg)
+    if (!buffer.length) {
+      throw new Error('sips produced an empty JPEG')
+    }
+    return buffer
+  } finally {
+    await fs.promises.rm(tmpDir, {recursive: true, force: true}).catch(() => undefined)
+  }
+}
+
+async function rasterizeHeicFallback(inputPath: string): Promise<Buffer> {
+  if (process.platform === 'darwin') {
+    return rasterizeHeicWithSips(inputPath)
+  }
+  throw new Error(`HEIC decode fallback is unavailable on ${process.platform}`)
+}
+
+/**
+ * Run a sharp pipeline; for HEIC paths that fail pixel-decode, rasterize via sips and retry.
+ */
+async function withDecodableImageInput<T>(
+  input: string | Buffer,
+  run: (source: string | Buffer, forceJpeg: boolean) => Promise<T>,
+): Promise<T> {
+  const forceJpeg = typeof input === 'string' && isHeicLikePath(input)
+  try {
+    return await run(input, forceJpeg)
+  } catch (error) {
+    if (typeof input !== 'string' || !isHeicLikePath(input)) throw error
+    const raster = await rasterizeHeicFallback(input)
+    return run(raster, true)
+  }
+}
+
+async function writeThumbWithSharp(input: string | Buffer, outputPath: string): Promise<void> {
+  const sharp = await getSharp()
+  await withDecodableImageInput(input, async (source) => {
+    await writeFileAtomically(outputPath, async (tempPath) => {
+      await sharp(source, SHARP_READ_OPTIONS)
+        .rotate()
+        .resize({height: THUMB_HEIGHT, withoutEnlargement: true})
+        .jpeg({quality: THUMB_JPEG_QUALITY, mozjpeg: true})
+        .toFile(tempPath)
+    })
+  })
+}
+
+/**
+ * Downscale an image so its longest edge is at most `maxEdge`.
+ * Returns null when the source is already within the limit (caller should serve the original),
+ * except for HEIC/HEIF which are always re-encoded to JPEG for browser-safe viewing.
+ */
+async function resizeImageToMaxEdge (
+  input: string | Buffer,
+  maxEdge: number,
+): Promise<{buffer: Buffer; width: number; height: number} | null> {
+  const sharp = await getSharp()
+  return withDecodableImageInput(input, async (source, forceJpeg) => {
+    const meta = await sharp(source, SHARP_READ_OPTIONS).rotate().metadata()
+    const width = Number(meta.width) || 0
+    const height = Number(meta.height) || 0
+    if (width <= 0 || height <= 0) return null
+    if (!forceJpeg && Math.max(width, height) <= maxEdge) return null
+
+    let pipeline = sharp(source, SHARP_READ_OPTIONS).rotate()
+    if (Math.max(width, height) > maxEdge) {
+      pipeline = pipeline.resize({
+        width: maxEdge,
+        height: maxEdge,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+    }
+
+    const buffer = await pipeline
+      .jpeg({quality: VIEWER_JPEG_QUALITY, mozjpeg: true})
+      .toBuffer()
+
+    const out = await sharp(buffer).metadata()
+    return {
+      buffer,
+      width: Number(out.width) || 0,
+      height: Number(out.height) || 0,
+    }
+  })
+}
+
+async function decodeImageBuffer(buffer: Buffer): Promise<JimpImage> {
+  try {
+    return await Jimp.read(buffer) as unknown as JimpImage
+  } catch (jimpError) {
+    try {
+      const sharp = await getSharp()
+      const pngBuffer = await sharp(buffer, SHARP_READ_OPTIONS).png().toBuffer()
+      return await Jimp.read(pngBuffer) as unknown as JimpImage
+    } catch (sharpError) {
+      const jimpMessage = jimpError instanceof Error ? jimpError.message : String(jimpError)
+      const sharpMessage = sharpError instanceof Error ? sharpError.message : String(sharpError)
+      const error = new Error(`Unable to decode image: ${jimpMessage}; sharp fallback failed: ${sharpMessage}`)
+      ;(error as Error & {cause?: unknown}).cause = sharpError
+      throw error
+    }
+  }
+}
+
+async function writeJpeg(image: JimpImage, outputPath: string, quality = THUMB_JPEG_QUALITY) {
+  const buffer = await image.getBuffer('image/jpeg', {quality})
+  await writeFileAtomically(outputPath, async (tempPath) => {
+    await fs.promises.writeFile(tempPath, buffer)
+  })
+}
+
+async function readExifOrientation(pathToFile: string): Promise<number> {
+  try {
+    const orientation = await exifr.orientation(pathToFile)
+    if (typeof orientation === 'number' && Number.isInteger(orientation) && orientation >= 1 && orientation <= 8) {
+      return orientation
+    }
+  } catch {
+    // EXIF is optional; fall back to the default orientation.
+  }
+
+  return 1
+}
+
+async function applyExifOrientation(image: JimpImage, orientation: number) {
+  switch (orientation) {
+    case 2:
+      await image.flip({horizontal: true, vertical: false})
+      break
+    case 3:
+      await image.rotate(180)
+      break
+    case 4:
+      await image.flip({horizontal: false, vertical: true})
+      break
+    case 5:
+      await image.flip({horizontal: true, vertical: false})
+      await image.rotate(90)
+      break
+    case 6:
+      await image.rotate(90)
+      break
+    case 7:
+      await image.flip({horizontal: true, vertical: false})
+      await image.rotate(270)
+      break
+    case 8:
+      await image.rotate(270)
+      break
+    default:
+      break
+  }
+
+  return image
+}
+
+async function readExifOrientationFromBuffer(buffer: Buffer): Promise<number> {
+  try {
+    const orientation = await exifr.orientation(buffer)
+    if (typeof orientation === 'number' && Number.isInteger(orientation) && orientation >= 1 && orientation <= 8) {
+      return orientation
+    }
+  } catch {
+    // EXIF is optional; fall back to the default orientation.
+  }
+
+  return 1
+}
+
+async function readMetadataWithSharp(input: string | Buffer) {
+  const sharp = await getSharp()
+  let source: string | Buffer = input
+
+  if (typeof input === 'string' && isHeicLikePath(input)) {
+    try {
+      const probe = await sharp(input, SHARP_READ_OPTIONS).metadata()
+      if ((Number(probe.width) || 0) <= 0 || (Number(probe.height) || 0) <= 0) {
+        source = await rasterizeHeicFallback(input)
+      }
+    } catch {
+      source = await rasterizeHeicFallback(input)
+    }
+  }
+
+  const meta = await sharp(source, SHARP_READ_OPTIONS).metadata()
+  const width = Number(meta.width) || 0
+  const height = Number(meta.height) || 0
+  if (width <= 0 || height <= 0) {
+    throw new Error('Image metadata missing dimensions')
+  }
+
+  const orientation = Number(meta.orientation)
+  let resolvedOrientation = 1
+  if (Number.isInteger(orientation) && orientation >= 1 && orientation <= 8) {
+    resolvedOrientation = orientation
+  } else if (typeof input === 'string') {
+    resolvedOrientation = await readExifOrientation(input)
+  } else if (Buffer.isBuffer(input)) {
+    resolvedOrientation = await readExifOrientationFromBuffer(input)
+  }
+
+  // sips JPEG output is already display-oriented.
+  if (source !== input && Buffer.isBuffer(source)) {
+    resolvedOrientation = 1
+  }
+
+  const display = getDisplayDimensions(width, height, resolvedOrientation)
+  return {
+    width: display.width,
+    height: display.height,
+    orientation: resolvedOrientation,
+  }
+}
+
+async function processAndSaveImageWithSharp({
+  buffer,
+  outputPath,
+  sizes,
+}: ProcessAndSaveImageOptions) {
+  const sharp = await getSharp()
+  // Auto-orient first so crop/resize use display pixels.
+  const orientedBuffer = await sharp(buffer, SHARP_READ_OPTIONS).rotate().toBuffer()
+  const meta = await sharp(orientedBuffer).metadata()
+  let width = Number(meta.width) || 0
+  let height = Number(meta.height) || 0
+  if (width <= 0 || height <= 0) {
+    throw new Error('Oriented image missing dimensions')
+  }
+
+  let pipeline = sharp(orientedBuffer)
+
+  if (sizes?.width && sizes?.height) {
+    const targetWidth = sizes.width
+    const targetHeight = sizes.height
+    const aspectRatio = width / height
+    const targetAspectRatio = targetWidth / targetHeight
+
+    if (Math.abs(targetAspectRatio - aspectRatio) > 0.01) {
+      const crop = getCenterCropRect(width, height, targetAspectRatio)
+      pipeline = pipeline.extract({
+        left: crop.x,
+        top: crop.y,
+        width: crop.w,
+        height: crop.h,
+      })
+      width = crop.w
+      height = crop.h
+    }
+
+    if (targetWidth < width || targetHeight < height) {
+      pipeline = pipeline.resize(targetWidth, targetHeight, {fit: 'fill'})
+    }
+  }
+
+  await writeFileAtomically(outputPath, async (tempPath) => {
+    await pipeline
+      .jpeg({quality: THUMB_JPEG_QUALITY, mozjpeg: true})
+      .toFile(tempPath)
+  })
+  return path.normalize(outputPath)
+}
+
+async function processAndSaveImageWithJimp({buffer, outputPath, sizes}: ProcessAndSaveImageOptions) {
+  const image = await decodeImageBuffer(buffer)
+  const width = image.width
+  const height = image.height
+  const aspectRatio = width / height
+
+  if (sizes?.width && sizes?.height) {
+    const targetWidth = sizes.width
+    const targetHeight = sizes.height
+    const targetAspectRatio = targetWidth / targetHeight
+
+    if (Math.abs(targetAspectRatio - aspectRatio) > 0.01) {
+      const crop = getCenterCropRect(width, height, targetAspectRatio)
+      await image.crop(crop)
+    }
+
+    if (targetWidth < image.width || targetHeight < image.height) {
+      await image.resize({w: targetWidth, h: targetHeight})
+    }
+  }
+
+  await writeJpeg(image, outputPath, THUMB_JPEG_QUALITY)
+  return path.normalize(outputPath)
+}
+
+const getImageMetadataFromBuffer = async (buffer: Buffer) => {
+  try {
+    assertNonEmptyImageSource(buffer, 'image')
+    return await readMetadataWithSharp(buffer)
+  } catch (error: unknown) {
+    try {
+      assertNonEmptyImageSource(buffer, 'image')
+      const image = await decodeImageBuffer(buffer)
+      const orientation = await readExifOrientationFromBuffer(buffer)
+      const display = getDisplayDimensions(image.width, image.height, orientation)
+      return {
+        width: display.width,
+        height: display.height,
+        orientation,
+      }
+    } catch (fallbackError: unknown) {
+      const message = fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+      console.error('Image metadata extraction failed for buffer:', message)
+      return null
+    }
+  }
+}
+
+const getImageMetadata = async (pathToFile: string) => {
+  try {
+    const { isVirtualZipPath, readZipEntryBuffer } = await import('./zipGallery')
+    if (isVirtualZipPath(pathToFile)) {
+      const entry = await readZipEntryBuffer(pathToFile)
+      if (!entry) return null
+      return getImageMetadataFromBuffer(entry.buffer)
+    }
+
+    assertNonEmptyImageSource(pathToFile, 'image')
+    return await readMetadataWithSharp(pathToFile)
+  } catch (error: unknown) {
+    const early = error instanceof Error ? error.message : String(error)
+    if (early.startsWith('Empty ') || early.startsWith('Missing ')) {
+      console.error(`Image metadata extraction failed for ${pathToFile}:`, early)
+      return null
+    }
+    try {
+      const image = await Jimp.read(pathToFile) as unknown as JimpImage
+      const orientation = await readExifOrientation(pathToFile)
+      const display = getDisplayDimensions(image.width, image.height, orientation)
+      return {
+        width: display.width,
+        height: display.height,
+        orientation,
+      }
+    } catch (fallbackError: unknown) {
+      const message = fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+      console.error(`Image metadata extraction failed for ${pathToFile}:`, message)
+      return null
+    }
+  }
+}
+
+const ensureImageThumbDir = (dbPath: string) => {
+  const outputDir = path.join(dbPath, 'media/images/thumbs')
+  fs.mkdirSync(outputDir, {recursive: true})
+  return outputDir
+}
+
+const createImageThumbFromBufferWithJimp = async (
+  buffer: Buffer,
+  outputPath: string,
+) => {
+  const orientation = await readExifOrientationFromBuffer(buffer)
+  const image = await decodeImageBuffer(buffer)
+
+  await applyExifOrientation(image, orientation)
+
+  if (image.height > THUMB_HEIGHT) {
+    await image.resize({h: THUMB_HEIGHT})
+  }
+
+  await writeJpeg(image, outputPath)
+  return outputPath
+}
+
+const createImageThumbFromBuffer = async (buffer: Buffer, id: string | number, dbPath: string) => {
+  assertNonEmptyImageSource(buffer, 'image')
+  const outputDir = ensureImageThumbDir(dbPath)
+  const outputPath = path.join(outputDir, `${id}.jpg`)
+
+  try {
+    await writeThumbWithSharp(buffer, outputPath)
+    return outputPath
+  } catch {
+    return createImageThumbFromBufferWithJimp(buffer, outputPath)
+  }
+}
+
+const createImageThumb = async (pathToFile: string, id: string | number, dbPath: string) => {
+  const { isVirtualZipPath, readZipEntryBuffer } = await import('./zipGallery')
+  if (isVirtualZipPath(pathToFile)) {
+    const entry = await readZipEntryBuffer(pathToFile)
+    if (!entry) {
+      throw new Error(`ZIP entry not found: ${pathToFile}`)
+    }
+    return createImageThumbFromBuffer(entry.buffer, id, dbPath)
+  }
+
+  assertNonEmptyImageSource(pathToFile, 'image')
+  const outputDir = ensureImageThumbDir(dbPath)
+  const outputPath = path.join(outputDir, `${id}.jpg`)
+
+  try {
+    await writeThumbWithSharp(pathToFile, outputPath)
+    return outputPath
+  } catch {
+    if (isHeicLikePath(pathToFile)) {
+      // Jimp cannot decode HEIC — surface the sharp/sips failure instead.
+      throw new Error(`Unable to create HEIC thumbnail for ${pathToFile}`)
+    }
+
+    const orientation = await readExifOrientation(pathToFile)
+    const image = await Jimp.read(pathToFile) as unknown as JimpImage
+
+    await applyExifOrientation(image, orientation)
+
+    if (image.height > THUMB_HEIGHT) {
+      await image.resize({h: THUMB_HEIGHT})
+    }
+
+    await writeJpeg(image, outputPath)
+    return outputPath
+  }
+}
+
+async function processAndSaveImage(options: ProcessAndSaveImageOptions) {
+  const outputPath = path.normalize(String(options.outputPath || ''))
+  const normalized = {...options, outputPath}
+  fs.mkdirSync(path.dirname(outputPath), {recursive: true})
+  try {
+    return await processAndSaveImageWithSharp(normalized)
+  } catch {
+    return processAndSaveImageWithJimp(normalized)
+  }
+}
+
+export {
+  getImageMetadata,
+  getImageMetadataFromBuffer,
+  createImageThumb,
+  createImageThumbFromBuffer,
+  ensureImageThumbDir,
+  getCenterCropRect,
+  processAndSaveImage,
+  readExifOrientation,
+  applyExifOrientation,
+  getDisplayDimensions,
+  resizeImageToMaxEdge,
+}

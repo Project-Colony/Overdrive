@@ -1,0 +1,246 @@
+<template>
+  <v-system-bar
+    :class="{ maximized: maximized }"
+    :color="colorRGBA"
+    :style="gradient"
+    class="system-bar-custom"
+    window
+    app
+  >
+    <div class="app-menu-container">
+      <SystemMenuDropdown
+        v-for="menu in SYSTEM_MENUS"
+        :key="menu.id"
+        :menu="menu"
+        :open-menu-id="openMenuId"
+        :is-action-disabled="isActionDisabled"
+        :is-action-checked="isActionChecked"
+        @update:open-menu-id="openMenuId = $event"
+        @action="handleMenuAction"
+      />
+    </div>
+
+    <v-spacer></v-spacer>
+    <div
+      class="app-system-bar-title"
+      v-text="app_title"
+    ></div>
+    <v-spacer></v-spacer>
+
+    <WindowControls
+      windows-style
+      @minimize="minimize"
+      @maximize="maximize"
+      @unmaximize="unmaximize"
+      @close="close"
+      window-type="main"
+    />
+  </v-system-bar>
+</template>
+
+<script setup lang="ts">
+import {ref, computed, onMounted, onUnmounted, defineAsyncComponent} from 'vue'
+import {useRouter} from 'vue-router'
+import {useAppStore} from '@/stores/app'
+import {useHeaderBarStyle} from '@/composable/useHeaderBarStyle'
+import {useSystemMenuActions} from '@/composable/useSystemMenuActions'
+import {useAppMenuCheckedState} from '@/composable/useAppMenuState'
+import {SYSTEM_MENUS} from '@/types/systemMenu'
+import type {SystemMenuAction} from '@/types/systemMenu'
+import {isAppMenuActionChecked} from '@shared/electron/appMenuState'
+import {subscribeElectronIpc} from '@/utils/electronIpc'
+import SystemMenuDropdown from '@/components/app/SystemMenuDropdown.vue'
+const WindowControls = defineAsyncComponent(() => import('@/components/ui/WindowControls.vue'))
+
+defineProps<{
+  disabled?: boolean
+}>()
+
+const emit = defineEmits<{
+  lock: []
+}>()
+
+const maximized = ref(false)
+const openMenuId = ref<string | null>(null)
+
+const router = useRouter()
+const appStore = useAppStore()
+const {runSystemMenuAction, isActionDisabled} = useSystemMenuActions({
+  onLock: () => emit('lock'),
+})
+const menuState = useAppMenuCheckedState()
+
+function isActionChecked(action: SystemMenuAction) {
+  return isAppMenuActionChecked(action, menuState.value)
+}
+const {colorRGBA, gradient} = useHeaderBarStyle('system')
+
+const app_title = computed(() => appStore.app_title || 'MediaChips')
+
+const minimize = () => {}
+
+const maximize = () => {
+  maximized.value = true
+}
+
+const unmaximize = () => {
+  maximized.value = false
+}
+
+const close = () => {
+  // WindowControls already sends closeApp — do not double-fire IPC.
+}
+
+const handleMenuAction = (action: SystemMenuAction) => {
+  void runSystemMenuAction(action)
+}
+
+const back = () => {
+  router.go(-1)
+}
+
+const forward = () => {
+  router.go(1)
+}
+
+const handleMaximize = () => {
+  maximized.value = true
+}
+
+const handleUnmaximize = () => {
+  maximized.value = false
+}
+
+const handleNavigationBack = () => {
+  back()
+}
+
+const handleNavigationForward = () => {
+  forward()
+}
+
+let unsubscribeMaximize: (() => void) | undefined
+let unsubscribeUnmaximize: (() => void) | undefined
+let unsubscribeNavigationBack: (() => void) | undefined
+let unsubscribeNavigationForward: (() => void) | undefined
+
+onMounted(() => {
+  unsubscribeMaximize = subscribeElectronIpc('maximize', handleMaximize)
+  unsubscribeUnmaximize = subscribeElectronIpc('unmaximize', handleUnmaximize)
+  unsubscribeNavigationBack = subscribeElectronIpc('navigationBack', handleNavigationBack)
+  unsubscribeNavigationForward = subscribeElectronIpc('navigationForward', handleNavigationForward)
+})
+
+onUnmounted(() => {
+  unsubscribeMaximize?.()
+  unsubscribeUnmaximize?.()
+  unsubscribeNavigationBack?.()
+  unsubscribeNavigationForward?.()
+})
+</script>
+
+<style lang="scss">
+.app-menu-container {
+  -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  flex: 0 0 auto;
+
+  .v-btn,
+  .system-menu-btn {
+    -webkit-app-region: no-drag;
+    text-transform: capitalize;
+    font-weight: normal;
+    letter-spacing: normal;
+    padding: 0 8px !important;
+    min-width: 0 !important;
+
+    &__content {
+      line-height: 1;
+    }
+  }
+}
+
+.app-system-bar-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.system-bar-custom.v-system-bar {
+  overflow: visible;
+  position: relative;
+  -webkit-app-region: drag;
+
+  .app-menu-container,
+  .app-menu-container .v-btn,
+  .system-menu,
+  .system-menu-btn,
+  .window-controls,
+  .window-controls .v-btn,
+  .window-controls .window-control-btn {
+    -webkit-app-region: no-drag;
+  }
+}
+
+.context-menu,
+.system-menu,
+.system-menu-btn,
+.system-menu-dropdown,
+.system-menu-dropdown .v-list,
+.system-menu-dropdown .v-list-item {
+  -webkit-app-region: no-drag;
+}
+
+.system-menu-btn {
+  position: relative;
+  z-index: 2;
+}
+
+.system-menu-dropdown {
+  min-width: 220px !important;
+}
+
+/* v-menu content is teleported to <body>; do not nest under .system-bar-custom */
+.system-menu-dropdown.context-menu,
+.system-menu-dropdown .context-menu {
+  min-width: 220px;
+
+  .system-menu-item-with-hotkey {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+
+    > span:first-child {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .v-hotkey {
+      flex: 0 0 auto;
+      margin-left: auto;
+    }
+  }
+
+  .system-menu-check--off {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .app-system-bar-title {
+    display: none;
+  }
+}
+</style>

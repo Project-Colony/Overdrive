@@ -1,0 +1,66 @@
+/**
+ * @vitest-environment node
+ */
+import { describe, expect, it } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import archiver from 'archiver'
+import { checkFilesExist, CHECK_FILES_EXIST_CONCURRENCY, MAX_BATCH_SIZE } from './checkFilesExist'
+import { buildVirtualZipPath } from './zipGallery'
+
+async function writeZip(zipPath: string, files: Record<string, Buffer | string>) {
+  await fs.promises.mkdir(path.dirname(zipPath), { recursive: true })
+  const output = fs.createWriteStream(zipPath)
+  const archive = archiver('zip', { zlib: { level: 1 } })
+  const done = new Promise<void>((resolve, reject) => {
+    output.on('close', () => resolve())
+    output.on('error', reject)
+    archive.on('error', reject)
+  })
+  archive.pipe(output)
+  for (const [name, content] of Object.entries(files)) {
+    archive.append(typeof content === 'string' ? Buffer.from(content) : content, { name })
+  }
+  await archive.finalize()
+  await done
+}
+
+describe('checkFilesExist', () => {
+  it('returns existence map for unique paths', async () => {
+    const results = await checkFilesExist([
+      __filename,
+      __filename,
+      '/definitely-missing-file-12345.tmp',
+    ])
+
+    expect(results[__filename]).toBe(true)
+    expect(results['/definitely-missing-file-12345.tmp']).toBe(false)
+    expect(Object.keys(results)).toHaveLength(2)
+  })
+
+  it('detects virtual zip entry existence', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediachips-check-zip-'))
+    try {
+      const zipPath = path.join(tempDir, 'g.zip')
+      await writeZip(zipPath, { 'a.jpg': 'x' })
+      const virtual = buildVirtualZipPath(zipPath, 'a.jpg')
+      const missing = buildVirtualZipPath(zipPath, 'missing.jpg')
+      const folderBang = path.join(tempDir, 'Back Out Again!', 'photo.jpg')
+      await fs.promises.mkdir(path.dirname(folderBang), { recursive: true })
+      await fs.promises.writeFile(folderBang, 'y')
+
+      const results = await checkFilesExist([virtual, missing, folderBang])
+      expect(results[virtual]).toBe(true)
+      expect(results[missing]).toBe(false)
+      expect(results[folderBang]).toBe(true)
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('exports bounded concurrency for grid existence checks', () => {
+    expect(CHECK_FILES_EXIST_CONCURRENCY).toBe(16)
+    expect(MAX_BATCH_SIZE).toBe(100)
+  })
+})

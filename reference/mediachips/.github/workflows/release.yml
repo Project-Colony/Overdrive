@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            distFlag: --win
+          - os: macos-latest
+            name: macOS
+            distFlag: --mac
+          - os: ubuntu-latest
+            name: Linux
+            distFlag: --linux
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag v$TAG does not match package.json version $VERSION"
+            exit 1
+          fi
+
+      - name: Cache ML models
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: mediachips-models-${{ hashFiles('scripts/download-parser-model.ts', 'scripts/download-face-models.ts') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Build installers
+        run: npm run dist -- ${{ matrix.distFlag }}
+
+      - name: Build Windows portable
+        if: matrix.os == 'windows-latest'
+        run: npm run portable
+
+      - name: Collect distribution files
+        shell: bash
+        run: |
+          mkdir -p dist-assets
+          shopt -s nullglob
+          for pattern in '*.exe' '*.dmg' '*.zip' '*.AppImage' '*.blockmap' 'latest*.yml'; do
+            for file in release/$pattern; do
+              cp "$file" dist-assets/
+            done
+          done
+          echo "Distribution files:"
+          ls -la dist-assets/
+          test "$(ls -A dist-assets)"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: dist-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: List release files
+        run: find release -maxdepth 1 -type f | sort
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          NOTES_FILE="$(mktemp)"
+
+          if node scripts/extract-changelog.mjs "$VERSION" "$NOTES_FILE"; then
+            echo "Using CHANGELOG.md for release notes"
+          else
+            echo "No CHANGELOG section for v$VERSION, falling back to generated notes"
+            NOTES_FILE=""
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists, uploading assets"
+            if [ -n "$NOTES_FILE" ]; then
+              gh release edit "$TAG" --notes-file "$NOTES_FILE"
+            fi
+          elif [ -n "$NOTES_FILE" ]; then
+            gh release create "$TAG" \
+              --title "MediaChips $TAG" \
+              --notes-file "$NOTES_FILE"
+          else
+            gh release create "$TAG" \
+              --title "MediaChips $TAG" \
+              --generate-notes
+          fi
+
+          upload_file() {
+            local file="$1"
+            local attempt=1
+            while [ "$attempt" -le 5 ]; do
+              if gh release upload "$TAG" "$file" --clobber; then
+                echo "Uploaded $(basename "$file")"
+                return 0
+              fi
+              echo "Upload failed for $(basename "$file"), retry $attempt/5..."
+              sleep $((attempt * 20))
+              attempt=$((attempt + 1))
+            done
+            return 1
+          }
+
+          mapfile -t yml_files < <(find release -maxdepth 1 -type f -name 'latest*.yml' | sort)
+          mapfile -t asset_files < <(find release -maxdepth 1 -type f \( \
+            -name '*.exe' -o -name '*.dmg' -o -name '*.zip' -o -name '*.AppImage' -o -name '*.blockmap' \
+          \) | sort)
+
+          echo "Uploading ${#yml_files[@]} metadata file(s), then ${#asset_files[@]} asset(s)"
+
+          for file in "${yml_files[@]}"; do
+            upload_file "$file"
+          done
+
+          for file in "${asset_files[@]}"; do
+            upload_file "$file"
+          done
+
+          gh release edit "$TAG" --draft=false

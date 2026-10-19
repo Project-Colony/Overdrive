@@ -1,0 +1,720 @@
+import {ref, computed, nextTick} from 'vue'
+import uniqBy from 'lodash/uniqBy'
+import {cloneFilters} from '@/utils/filterClone'
+import throttle from 'lodash/throttle'
+import {useI18n} from 'vue-i18n'
+import {useItemsStore} from '@/stores/items'
+import {typedApi} from '@/services/typedApi'
+import {scrollMainTo, getMainScrollEl} from '@/utils/mainScroll'
+import {
+  getDuplicatesGroupKey,
+  normalizeSortBy,
+} from '@/utils/mediaSortFilter'
+import type {
+  InfiniteIntersectOptions,
+  ItemsPageListQuery,
+  ItemsPageLoader,
+  MediaListResponse,
+  UseItemsPageOptions,
+} from '@/types/itemsPage'
+import {trimInfiniteScrollItems, resolvePageLimit} from '@shared/listPagination'
+import {compensateScrollAfterTopTrim} from '@/utils/infiniteScrollTrim'
+import {
+  normalizeItemsGroupBy,
+  serializeGroupBySetting,
+} from '@/utils/itemsGroupBy'
+import {orderItemsByIds} from '@/utils/orderItemsByIds'
+import {clearHoverPreviewUnavailableCache} from '@/utils/hoverPreviewUnavailableCache'
+
+export const INFINITE_PAGE_SIZE = 25
+
+/** Min gap between infinite-scroll page fetches (stops fast-fling burst loads). */
+export const INFINITE_LOAD_COOLDOWN_MS = 450
+
+/** Auto-fill only when the first pages don't cover the viewport. */
+export const INFINITE_SHORT_VIEWPORT_FILL_MAX = 2
+
+/** Next infinite-scroll page from the current page index (not DOM window size). */
+export function getNextInfiniteMediaPage(currentPage: number): number {
+  return Math.max(1, Number(currentPage) || 1) + 1
+}
+
+export function isAbortError(error: unknown): boolean {
+  const err = error as { code?: string; name?: string }
+  return err?.code === 'ERR_CANCELED'
+    || err?.name === 'CanceledError'
+}
+
+export function useItemsPage({
+  props,
+  mediaType,
+  container: _container,
+  updatePageSetting,
+}: UseItemsPageOptions) {
+  const itemsStore = useItemsStore()
+  const {t} = useI18n()
+
+  const total = ref(1)
+  const totalInDb = ref(0)
+  const pages = ref(0)
+  const loader = ref<ItemsPageLoader>({
+    show: false,
+    timeout: 0,
+    is_busy: false,
+  })
+  const isLoadingMore = ref(false)
+  const infiniteScrollExhausted = ref(false)
+  const scrollRoot = ref<HTMLElement | null>(null)
+
+  let listFetchSeq = 0
+  let listAbortController: AbortController | null = null
+  let mediaScrollEl: HTMLElement | null = null
+  let lastInfiniteLoadAt = 0
+  let shortViewportFillCount = 0
+  let pendingFillTimer: ReturnType<typeof setTimeout> | null = null
+
+  const ITEMS = computed(() => itemsStore)
+  const is_infinite_scroll = computed(() => ITEMS.value.limit === 101)
+  const showPagination = computed(() => (
+    ITEMS.value.itemsOnPage.length > 0 && !is_infinite_scroll.value && pages.value > 0
+  ))
+  const paginationPage = computed({
+    get: () => ITEMS.value.page,
+    set: (value: number) => {
+      itemsStore.updateState({key: 'page', value})
+    },
+  })
+  const paginationJumpPage = computed({
+    get: () => ITEMS.value.jumpPage,
+    set: (value: number | null) => {
+      itemsStore.updateState({key: 'jumpPage', value})
+    },
+  })
+
+  const abortPendingListFetch = (): void => {
+    listAbortController?.abort()
+    listAbortController = null
+  }
+
+  const resetMediaListState = (): void => {
+    infiniteScrollExhausted.value = false
+    itemsStore.updateMultiple({
+      itemsOnPage: [],
+      entities: [],
+      navigationItems: [],
+      totalFiltered: 0,
+    })
+    total.value = 0
+    totalInDb.value = 0
+    pages.value = 0
+  }
+
+  const applyListResponse = (
+    response: MediaListResponse,
+    {append = false, requestedPage = 1}: {append?: boolean; requestedPage?: number} = {},
+  ): boolean => {
+    const pageItems = response.data.items || []
+    const responseTotalFiltered = response.data.totalFiltered
+
+    if (
+      !append
+      && pageItems.length === 0
+      && responseTotalFiltered != null
+      && responseTotalFiltered > 0
+      && requestedPage <= 1
+    ) {
+      return false
+    }
+
+    if (response.data.navigation) {
+      itemsStore.updateState({
+        key: 'navigationItems',
+        value: response.data.navigation,
+      })
+    }
+
+    if (response.data.totalFiltered != null) {
+      itemsStore.updateState({
+        key: 'totalFiltered',
+        value: response.data.totalFiltered,
+      })
+      total.value = response.data.totalFiltered
+    } else if (!append) {
+      itemsStore.updateState({
+        key: 'totalFiltered',
+        value: pageItems.length,
+      })
+      total.value = pageItems.length
+    }
+
+    if (response.data.totalFilesize != null) {
+      itemsStore.updateState({
+        key: 'totalFilesize',
+        value: response.data.totalFilesize || 0,
+      })
+    }
+
+    if (response.data.total != null) {
+      totalInDb.value = response.data.total || 0
+    }
+
+    if (response.data.pages != null) {
+      pages.value = response.data.pages || 1
+    }
+
+    // ID-scoped lists (semantic / more-like-this) only fetch one page of ids from the
+    // API, so override totals from the full ranked scope kept on the store.
+    const scopeIdsForTotals = ITEMS.value.listScopeIds
+    if (
+      props.items_type === 'media'
+      && Array.isArray(scopeIdsForTotals)
+      && scopeIdsForTotals.length > 0
+    ) {
+      const scopeTotal = scopeIdsForTotals.length
+      const scopePageLimit = resolvePageLimit(
+        is_infinite_scroll.value ? INFINITE_PAGE_SIZE : ITEMS.value.limit,
+      ) || scopeTotal
+      itemsStore.updateState({key: 'totalFiltered', value: scopeTotal})
+      total.value = scopeTotal
+      pages.value = Math.max(1, Math.ceil(scopeTotal / scopePageLimit))
+    }
+
+    let nextItems = append
+      ? uniqBy([...ITEMS.value.itemsOnPage, ...pageItems], 'id')
+      : pageItems
+
+    // Fresh grid (filters/sort/page replace) — allow hover to re-probe availability.
+    if (!append) {
+      clearHoverPreviewUnavailableCache()
+    }
+
+    const scopeIds = ITEMS.value.listScopeIds
+    if (
+      props.items_type === 'media'
+      && Array.isArray(scopeIds)
+      && scopeIds.length > 0
+    ) {
+      nextItems = orderItemsByIds(nextItems, scopeIds)
+    }
+
+    const scrollEl = is_infinite_scroll.value
+      ? (getMainScrollEl() as HTMLElement | null)
+      : null
+    const previousScrollHeight = scrollEl?.scrollHeight ?? 0
+    let trimmedFromTop = 0
+
+    if (is_infinite_scroll.value) {
+      const trimResult = trimInfiniteScrollItems(nextItems)
+      nextItems = trimResult.items
+      trimmedFromTop = trimResult.trimmedFromTop
+    }
+
+    itemsStore.updateMultiple({
+      entities: nextItems,
+      itemsOnPage: nextItems,
+      isFiltersLoaded: true,
+      ...(!append && response.data.groups
+        ? {groups: response.data.groups}
+        : (!append ? {groups: []} : {})),
+    })
+
+    if (trimmedFromTop > 0 && scrollEl) {
+      compensateScrollAfterTopTrim(previousScrollHeight)
+    }
+    return true
+  }
+
+  const getItemsFromDb = async (ids?: number[]): Promise<void> => {
+    let url = '/api/'
+    const query: ItemsPageListQuery = {}
+
+    if (props.items_type === 'tag') {
+      url += 'tag/items/'
+      query.metaId = props.metaId
+    } else if (props.items_type === 'media') {
+      url += 'media/items'
+      query.mediaTypeId = props.mediaTypeId
+    }
+
+    // Explicit `ids` arg = card refresh path. Full list uses listScopeIds when set.
+    // For scoped lists, only request the current page of ids so we do not hydrate
+    // hundreds of Item trees at once (main post-semantic-search perf cost).
+    const explicitIds = (ids && ids.length > 0) ? ids : null
+    const scopeIds = (!explicitIds && ITEMS.value.listScopeIds?.length)
+      ? ITEMS.value.listScopeIds
+      : null
+
+    // Scoped similar/semantic results are already ranked; do not AND with library filters.
+    query.filters = scopeIds
+      ? []
+      : cloneFilters(ITEMS.value.filters)
+    query.filtersJoin = ITEMS.value.filtersJoin === 'or' ? 'or' : 'and'
+    query.sortBy = normalizeSortBy(
+      ITEMS.value.sortBy || 'id',
+      props.items_type,
+      mediaType.value,
+      'createdAt',
+      ITEMS.value.safeAssigned,
+    ) || 'id'
+    query.direction = ITEMS.value.sortDir || 'desc'
+    query.find_duplicates = ITEMS.value.find_duplicates || false
+
+    if (props.items_type === 'media') {
+      query.duplicates_by = getDuplicatesGroupKey(mediaType.value, ITEMS.value.duplicates_by)
+    }
+
+    const appendListPage = (props.items_type === 'media' || props.items_type === 'tag')
+      && is_infinite_scroll.value
+      && ITEMS.value.page > 1
+      && ITEMS.value.itemsOnPage.length > 0
+      && !explicitIds
+
+    if (!appendListPage) {
+      shortViewportFillCount = 0
+      lastInfiniteLoadAt = 0
+    }
+    if (props.items_type === 'media') {
+      query.includeNavigation = false
+    }
+
+    if (props.items_type === 'media' || props.items_type === 'tag') {
+      const pageLimit = is_infinite_scroll.value ? INFINITE_PAGE_SIZE : ITEMS.value.limit
+
+      if (is_infinite_scroll.value && !appendListPage && !explicitIds) {
+        itemsStore.updateState({key: 'page', value: 1})
+        query.page = 1
+      } else {
+        query.page = ITEMS.value.page || 1
+      }
+
+      query.limit = pageLimit
+      query.skipTotals = appendListPage
+
+      if (props.items_type === 'tag' && ITEMS.value.namePrefix) {
+        query.namePrefix = ITEMS.value.namePrefix
+      }
+      if (props.items_type === 'tag' && ITEMS.value.colorFilter) {
+        query.colorFilter = ITEMS.value.colorFilter
+      }
+
+      const groupBy = ITEMS.value.groupBy
+      if (groupBy && groupBy !== 'none') {
+        query.groupBy = serializeGroupBySetting(
+          normalizeItemsGroupBy(groupBy),
+          ITEMS.value.groupByMetaId,
+        )
+      }
+    }
+
+    if (explicitIds) {
+      query.ids = explicitIds
+    } else if (scopeIds) {
+      const pageLimit = resolvePageLimit(
+        Number(query.limit) || (is_infinite_scroll.value ? INFINITE_PAGE_SIZE : ITEMS.value.limit),
+      )
+      const page = Math.max(1, Number(query.page) || 1)
+      if (pageLimit) {
+        const start = (page - 1) * pageLimit
+        query.ids = scopeIds.slice(start, start + pageLimit)
+      } else {
+        query.ids = [...scopeIds]
+      }
+      // Empty page of a scope must not fall through to an unscoped library fetch.
+      if (!query.ids.length) {
+        const scopeTotal = scopeIds.length
+        const scopePageLimit = pageLimit || scopeTotal || 1
+        if (!appendListPage) {
+          clearHoverPreviewUnavailableCache()
+        }
+        itemsStore.updateMultiple({
+          entities: appendListPage ? ITEMS.value.itemsOnPage : [],
+          itemsOnPage: appendListPage ? ITEMS.value.itemsOnPage : [],
+          isFiltersLoaded: true,
+          totalFiltered: scopeTotal,
+          ...(!appendListPage ? {groups: []} : {}),
+        })
+        total.value = scopeTotal
+        pages.value = Math.max(1, Math.ceil(scopeTotal / scopePageLimit))
+        if (appendListPage) {
+          infiniteScrollExhausted.value = true
+        }
+        loader.value.is_busy = false
+        return
+      }
+    } else {
+      query.ids = []
+    }
+
+    if (explicitIds) {
+      // Refresh card payloads only — never recompute/cache library totals.
+      query.skipTotals = true
+      try {
+        const res = await typedApi.postItemsList(url, query)
+
+        for (const id of explicitIds) {
+          const item = res.data.items?.find((entry) => Number(entry.id) === Number(id))
+          if (item) {
+            itemsStore.updateItem({id, item})
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching specific items:', e)
+      } finally {
+        loader.value.is_busy = false
+      }
+      return
+    }
+
+    abortPendingListFetch()
+    const requestSeq = ++listFetchSeq
+    const abortController = new AbortController()
+    listAbortController = abortController
+
+    if (!appendListPage) {
+      itemsStore.updateState({key: 'isFiltersLoaded', value: false})
+      loader.value.is_busy = true
+      loader.value.show = false
+    }
+
+    const postListQuery = (payload: ItemsPageListQuery, signal: AbortSignal) =>
+      typedApi.postItemsList(url, payload, {signal})
+
+    const finishListResponse = async (
+      response: MediaListResponse,
+      {
+        append = false,
+        requestedPage = 1,
+      }: {append?: boolean; requestedPage?: number} = {},
+    ): Promise<boolean> => {
+      if (!append) {
+        infiniteScrollExhausted.value = false
+      }
+
+      const applied = applyListResponse(response, {append, requestedPage})
+
+      if (
+        !applied
+        && !append
+        && requestedPage === 1
+      ) {
+        return false
+      }
+
+      if (!applied) {
+        return false
+      }
+
+      if (ITEMS.value.listScopeIds?.length) {
+        // Backend disables SQL pagination when `ids` are set and always reports page=1.
+        // Keep the client page so infinite-scroll / pager can advance through the scope.
+        itemsStore.updateState({key: 'page', value: requestedPage})
+      } else if (append) {
+        // Keep the page advanced by loadNextInfinitePage; response page can lag.
+      } else if (response.data.page != null) {
+        itemsStore.updateState({key: 'page', value: response.data.page})
+      }
+
+      if (append && (response.data.items?.length ?? 0) === 0) {
+        // Reached the end of the filtered set. Keep totalFiltered from the first page.
+        infiniteScrollExhausted.value = true
+      } else if (
+        append
+        && ITEMS.value.listScopeIds?.length
+        && ITEMS.value.itemsOnPage.length >= ITEMS.value.totalFiltered
+      ) {
+        infiniteScrollExhausted.value = true
+      } else if (append || is_infinite_scroll.value) {
+        // Fill short viewports only — do not chain loads while the user is flinging.
+        scheduleShortViewportFill()
+      }
+
+      return true
+    }
+
+    try {
+      let response = await postListQuery(query, abortController.signal)
+
+      if (requestSeq !== listFetchSeq) {
+        return
+      }
+
+      if (!appendListPage) {
+        clearTimeout(loader.value.timeout as ReturnType<typeof setTimeout>)
+        loader.value.timeout = setTimeout(() => {
+          loader.value.show = true
+        }, 500)
+      }
+
+      if (props.items_type === 'media' || props.items_type === 'tag') {
+        let applied = await finishListResponse(response, {
+          append: appendListPage,
+          requestedPage: query.page,
+        })
+
+        if (
+          !applied
+          && !appendListPage
+          && query.page === 1
+          && requestSeq === listFetchSeq
+        ) {
+          query.page = 1
+          itemsStore.updateState({key: 'page', value: 1})
+          response = await postListQuery(query, abortController.signal)
+          if (requestSeq === listFetchSeq) {
+            applied = await finishListResponse(response, {
+              append: false,
+              requestedPage: 1,
+            })
+          }
+        }
+
+        if (!applied && requestSeq === listFetchSeq) {
+          return
+        }
+      }
+    } catch (error) {
+      if (isAbortError(error) || requestSeq !== listFetchSeq) {
+        return
+      }
+
+      itemsStore.updateState({key: 'isFiltersLoaded', value: true})
+
+      if (typeof window !== 'undefined' && window.showNotification) {
+        window.showNotification(t('notifications_text.server_error_logs'), 'error')
+      }
+
+      // Never wipe a painted grid. 1.6.1 only preserved append failures; a failed
+      // full refresh after the first page (or when appendListPage was false due to
+      // a race) still cleared items → “Nothing here yet / add files” while Home
+      // counts stayed correct.
+      if (props.items_type === 'media' || props.items_type === 'tag') {
+        if (ITEMS.value.itemsOnPage.length > 0) {
+          if (appendListPage) {
+            itemsStore.updateState({
+              key: 'page',
+              value: Math.max(1, Number(ITEMS.value.page || 1) - 1),
+            })
+          }
+          infiniteScrollExhausted.value = false
+        } else if (!appendListPage) {
+          resetMediaListState()
+        }
+      }
+
+      // Handled above — do not rethrow or callers/fill loops may cascade reloads.
+    } finally {
+      if (requestSeq === listFetchSeq) {
+        loader.value.is_busy = false
+        // Active request must never leave filters/toolbar overlays spinning after it ends
+        // (empty-page retry failure, non-list item types, etc.). Superseded requests skip this.
+        if (!itemsStore.isFiltersLoaded) {
+          itemsStore.updateState({key: 'isFiltersLoaded', value: true})
+        }
+      }
+    }
+  }
+
+  const getEntitiesOnPage = (ids_remove: number[] = []): void => {
+    for (const id of ids_remove) {
+      itemsStore.removeItem(id)
+      totalInDb.value -= 1
+    }
+
+    const items = ITEMS.value.entities
+    total.value = items.length
+    itemsStore.updateState({key: 'totalFiltered', value: items.length})
+
+    const limit = is_infinite_scroll.value ? INFINITE_PAGE_SIZE : ITEMS.value.limit
+    const pagesCount = Math.ceil(total.value / limit)
+    pages.value = pagesCount
+
+    if (ITEMS.value.page > pagesCount) {
+      itemsStore.updateState({key: 'page', value: 1})
+    }
+
+    const start = (ITEMS.value.page - 1) * limit
+    const end = start + limit
+    const new_items_on_page = items.slice(start, end)
+
+    const items_concat = is_infinite_scroll.value
+      ? trimInfiniteScrollItems(
+        uniqBy([...ITEMS.value.itemsOnPage, ...new_items_on_page], 'id'),
+      ).items
+      : new_items_on_page
+
+    itemsStore.updateState({key: 'itemsOnPage', value: items_concat})
+    itemsStore.updateState({key: 'isFiltersLoaded', value: true})
+  }
+
+  const scrollTop = (): void => {
+    scrollMainTo({top: 0, behavior: 'smooth'})
+  }
+
+  const changePage = (val: number): void => {
+    itemsStore.updateState({key: 'page', value: val})
+    void updatePageSetting({page: val})
+
+    if (props.items_type === 'media' || props.items_type === 'tag') {
+      void getItemsFromDb()
+      scrollTop()
+      return
+    }
+
+    scrollTop()
+  }
+
+  const jumpToPage = (value: number | null = ITEMS.value.jumpPage): void => {
+    if (value === null || value === undefined) return
+
+    let val = Number(value)
+    if (val < 1) val = 1
+    else if (val > pages.value) val = pages.value
+
+    if (val !== ITEMS.value.page) {
+      itemsStore.updateState({key: 'page', value: val})
+    }
+
+    itemsStore.updateState({key: 'jumpPage', value: val})
+    changePage(val)
+  }
+
+  const refreshScrollRoot = (): HTMLElement | null => {
+    scrollRoot.value = getMainScrollEl() as HTMLElement | null
+    return scrollRoot.value
+  }
+
+  const loadNextInfinitePage = async (
+    source: 'user' | 'fill' = 'user',
+  ): Promise<void> => {
+    if (!is_infinite_scroll.value) return
+    if (loader.value.is_busy || isLoadingMore.value) return
+    if (infiniteScrollExhausted.value) return
+    if (ITEMS.value.totalFiltered <= 0) return
+    if (ITEMS.value.itemsOnPage.length >= ITEMS.value.totalFiltered) return
+
+    const now = Date.now()
+    if (now - lastInfiniteLoadAt < INFINITE_LOAD_COOLDOWN_MS) return
+
+    if (source === 'fill') {
+      if (shortViewportFillCount >= INFINITE_SHORT_VIEWPORT_FILL_MAX) return
+      shortViewportFillCount += 1
+    } else {
+      shortViewportFillCount = 0
+    }
+
+    lastInfiniteLoadAt = now
+    isLoadingMore.value = true
+    try {
+      itemsStore.updateState({
+        key: 'page',
+        value: getNextInfiniteMediaPage(ITEMS.value.page),
+      })
+      await getItemsFromDb()
+    } finally {
+      isLoadingMore.value = false
+    }
+  }
+
+  const scheduleShortViewportFill = (): void => {
+    if (pendingFillTimer) clearTimeout(pendingFillTimer)
+    pendingFillTimer = setTimeout(() => {
+      pendingFillTimer = null
+      maybeLoadMoreIfNearBottom()
+    }, INFINITE_LOAD_COOLDOWN_MS)
+  }
+
+  const maybeLoadMoreIfNearBottom = (): void => {
+    if (!is_infinite_scroll.value) return
+    if (loader.value.is_busy || isLoadingMore.value) return
+    if (infiniteScrollExhausted.value) return
+    if (ITEMS.value.totalFiltered <= 0) return
+    if (ITEMS.value.itemsOnPage.length >= ITEMS.value.totalFiltered) return
+
+    const el = refreshScrollRoot() || getMainScrollEl()
+    if (!el) return
+
+    const threshold = 240
+    const shortPage = el.scrollHeight <= el.clientHeight + threshold
+    // Only auto-fetch when the first screen isn't filled yet.
+    // Near-bottom while scrolling is handled by scroll + sentinel with cooldown.
+    if (shortPage) {
+      void loadNextInfinitePage('fill')
+    }
+  }
+
+  const infiniteScrolling = (isIntersecting: boolean): void => {
+    if (isIntersecting === false) return
+    void loadNextInfinitePage('user')
+  }
+
+  const infiniteIntersectOptions = computed((): InfiniteIntersectOptions => ({
+    handler: infiniteScrolling,
+    options: {
+      root: scrollRoot.value,
+      rootMargin: '200px 0px',
+      threshold: 0,
+    },
+  }))
+
+  const onInfiniteScroll = throttle(() => {
+    if (!is_infinite_scroll.value) return
+    const el = getMainScrollEl()
+    if (!el) return
+
+    const threshold = 240
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold
+    if (nearBottom) void loadNextInfinitePage('user')
+  }, 320)
+
+  const bindMediaInfiniteScroll = (): void => {
+    unbindMediaInfiniteScroll()
+    if (!is_infinite_scroll.value) return
+    mediaScrollEl = refreshScrollRoot() as HTMLElement | null
+    mediaScrollEl?.addEventListener('scroll', onInfiniteScroll, {passive: true})
+  }
+
+  const unbindMediaInfiniteScroll = (): void => {
+    if (mediaScrollEl) {
+      mediaScrollEl.removeEventListener('scroll', onInfiniteScroll)
+      mediaScrollEl = null
+    }
+    onInfiniteScroll.cancel()
+  }
+
+  const disposeListFetching = (): void => {
+    abortPendingListFetch()
+    listFetchSeq += 1
+    if (pendingFillTimer) {
+      clearTimeout(pendingFillTimer)
+      pendingFillTimer = null
+    }
+  }
+
+  return {
+    total,
+    totalInDb,
+    pages,
+    loader,
+    isLoadingMore,
+    infiniteScrollExhausted,
+    scrollRoot,
+    is_infinite_scroll,
+    showPagination,
+    paginationPage,
+    paginationJumpPage,
+    infiniteIntersectOptions,
+    getItemsFromDb,
+    getEntitiesOnPage,
+    changePage,
+    jumpToPage,
+    scrollTop,
+    resetMediaListState,
+    abortPendingListFetch,
+    disposeListFetching,
+    bindMediaInfiniteScroll,
+    unbindMediaInfiniteScroll,
+    maybeLoadMoreIfNearBottom,
+    refreshScrollRoot,
+    loadNextInfinitePage,
+  }
+}

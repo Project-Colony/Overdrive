@@ -1,0 +1,654 @@
+<template>
+  <v-dialog
+    :model-value="dialogs.documentation"
+    :fullscreen="xs"
+    scrollable
+    width="960"
+    @after-leave="resetSelection"
+    @update:model-value="dialogs.documentation = $event"
+  >
+    <v-card rounded="lg">
+      <DialogHeader
+        @close="closeDialog"
+        :header="t('documentation.title')"
+        icon="help-circle"
+        closable
+      />
+      <v-card-text class="pa-0">
+        <div class="documentation-container">
+          <!-- Левая колонка: TreeView -->
+          <div class="treeview-column">
+            <div class="sidebar-header">
+              <v-text-field
+                v-model="search"
+                density="compact"
+                :placeholder="t('documentation.search')"
+                prepend-inner-icon="mdi-magnify"
+                variant="outlined"
+                hide-details
+              />
+
+              <v-btn
+                :icon="isOpenAll ? 'mdi-unfold-less-horizontal' : 'mdi-unfold-more-horizontal'"
+                :aria-label="isOpenAll ? t('documentation.collapse_all') : t('documentation.expand_all')"
+                v-tooltip:bottom="isOpenAll ? t('documentation.collapse_all') : t('documentation.expand_all')"
+                variant="text"
+                size="small"
+                class="ml-2"
+                @click="toggleOpenAll"
+              />
+            </div>
+
+            <div class="treeview-wrapper">
+              <!-- Treeview -->
+              <v-treeview
+                v-model:activated="activatedIds"
+                v-model:opened="openedIds"
+                @update:activated="updateActivated"
+                :items="filteredItems"
+                :search="search"
+                active-strategy="single-leaf"
+                open-on-click
+                item-title="name"
+                item-value="id"
+                activatable
+                hoverable
+                density="comfortable"
+                color="primary"
+                shaped
+                class="styled-treeview"
+              >
+                <template #prepend="{ item }">
+                  <v-icon :icon="getDocIcon(item as DocumentationItem)" size="small" />
+                </template>
+                <template #title="{ item }">
+                  <div :id="'doc_' + (item as DocumentationItem).id" class="text-caption mr-4">
+                    {{ (item as DocumentationItem).name || (item as DocumentationItem).title }}
+                  </div>
+                </template>
+              </v-treeview>
+            </div>
+          </div>
+
+          <!-- Разделитель -->
+          <v-divider vertical />
+
+          <!-- Правая колонка: Контент -->
+          <div class="content-column" :class="{ 'no-selection': !selected.name }">
+            <!-- Заглушка при отсутствии выбора -->
+            <div v-if="!selected.name" class="no-selection-placeholder">
+              <v-icon icon="mdi-file-tree-outline" size="large" color="grey" />
+              <div class="text-h6 text-medium-emphasis mt-4">
+                {{ t('documentation.select_item') }}
+              </div>
+              <div class="text-body-2 text-medium-emphasis mt-2">
+                {{ t('documentation.choose_item') }}
+              </div>
+            </div>
+
+            <!-- Контент выбранного элемента -->
+            <div v-else class="selected-content">
+              <!-- Заголовок -->
+              <div class="content-header">
+                <div class="header-left">
+                  <v-icon :icon="selected.icon || 'mdi-file'" color="primary" class="mr-2" />
+                  <div>
+                    <div class="text-h5">{{ selected.name }}</div>
+                    <div v-if="selected.subtitle || selected.description"
+                      class="text-caption text-medium-emphasis mt-1">
+                      {{ selected.subtitle || selected.description }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="header-right">
+                  <v-btn
+                    v-if="selected.link"
+                    :href="selected.link"
+                    target="_blank"
+                    variant="text"
+                    size="small"
+                    prepend-icon="mdi-open-in-new"
+                  >
+                    {{ t('documentation.open') }}
+                  </v-btn>
+
+                  <v-btn
+                    v-if="selected.selector"
+                    @click="highlightElement(selected)"
+                    variant="text"
+                    size="small"
+                    prepend-icon="mdi-creation-outline"
+                    class="ml-2"
+                    color="primary"
+                  >
+                    {{ t('documentation.show_element') }}
+                  </v-btn>
+                </div>
+              </div>
+
+              <!-- Основной контент -->
+              <div class="content-body">
+                <v-alert v-if="errorSelector"
+                  type="info"
+                  class="text-caption"
+                  density="compact"
+                  variant="text">
+                  {{ t('documentation.nothing_to_highlight') }}
+                </v-alert>
+
+                <!-- HTML контент -->
+                <div v-if="selected.content" class="html-content" v-html="selected.content"></div>
+                <div v-else class="text-body-1 text-medium-emphasis">
+                  {{ t('documentation.no_content') }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useDisplay } from 'vuetify'
+import { useRouter } from 'vue-router'
+import { registerAppShellHandler } from '@/composable/appShell'
+import { useDialogsStore } from '@/stores/dialogs'
+import { useElementSpotlightStore } from '@/stores/elementSpotlight'
+import DialogHeader from "@/components/elements/DialogHeader.vue"
+import Documentation from "@/assets/Documentation"
+import { localizeDocumentation } from "@/assets/DocumentationTranslations"
+
+interface DocumentationItem {
+  id: string
+  name?: string
+  title?: string
+  icon?: string
+  subtitle?: string
+  description?: string
+  link?: string
+  selector?: string | string[]
+  /** Route to open before spotlighting (e.g. settings tab/section). */
+  navigate?: string
+  content?: string
+  children?: DocumentationItem[]
+  [key: string]: unknown
+}
+
+// Инициализация
+const { xs } = useDisplay()
+const { t, locale } = useI18n()
+const router = useRouter()
+const dialogsStore = useDialogsStore()
+const elementSpotlight = useElementSpotlightStore()
+
+// Реактивные данные
+const isOpenAll = ref(false)
+const errorSelector = ref(false)
+const keepSelectionOnClose = ref(false)
+const activatedIds = ref<string[]>([])
+const openedIds = ref<string[]>([])
+const selected = ref<Partial<DocumentationItem>>({})
+const search = ref('')
+const items = computed((): DocumentationItem[] => localizeDocumentation(Documentation, locale.value))
+
+// Фильтрация по поиску
+// Фильтрация по поиску - НЕ МУТИРУЕМ исходные данные
+const filteredItems = computed(() => {
+  if (!search.value.trim()) return items.value
+
+  const searchTerm = search.value.toLowerCase()
+
+  const filterItemsRecursive = (itemsList: DocumentationItem[]): DocumentationItem[] => {
+    return itemsList.flatMap((item) => {
+      const matches =
+        item.name?.toLowerCase().includes(searchTerm) ||
+        item.title?.toLowerCase().includes(searchTerm) ||
+        item.description?.toLowerCase().includes(searchTerm) ||
+        item.content?.toLowerCase().includes(searchTerm)
+
+      if (item.children) {
+        const filteredChildren = filterItemsRecursive(item.children)
+        if (filteredChildren.length > 0 || matches) {
+          return [{
+            ...item,
+            children: filteredChildren,
+          }]
+        }
+        return []
+      }
+
+      return matches ? [item] : []
+    })
+  }
+
+  return filterItemsRecursive([...items.value])
+})
+
+// Вычисляемые свойства
+const dialogs = computed(() => dialogsStore)
+
+// Methods
+const getDocIcon = (item: DocumentationItem) => {
+  if (item.children && item.children.length > 0) {
+    return openedIds.value.includes(item.id) ? 'mdi-folder-open' : 'mdi-folder'
+  }
+  return item.icon || 'mdi-file'
+}
+
+const highlightElement = async (item: Partial<DocumentationItem>) => {
+  const selectors = item.selector
+  if (!selectors) return
+
+  errorSelector.value = false
+  keepSelectionOnClose.value = true
+  dialogs.value.documentation = false
+
+  const navigateTo = typeof item.navigate === 'string' ? item.navigate.trim() : ''
+  if (navigateTo) {
+    try {
+      await router.push(navigateTo)
+      await nextTick()
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const matched = await elementSpotlight.spotlight(selectors, {
+    durationMs: 3200,
+    settleMs: navigateTo ? 520 : 280,
+    onDone: () => {
+      dialogs.value.documentation = true
+    },
+  })
+
+  if (!matched) {
+    // spotlight() already ran onDone and reopened the dialog when nothing matched.
+    errorSelector.value = true
+  }
+}
+
+const closeDialog = () => {
+  dialogs.value.documentation = false
+}
+
+const getAncestorIds = (
+  nodes: DocumentationItem[],
+  id: string,
+  path: string[] = [],
+): string[] | null => {
+  for (const node of nodes) {
+    if (node.id === id) return path
+
+    if (node.children) {
+      const found = getAncestorIds(node.children, id, [...path, node.id])
+      if (found) return found
+    }
+  }
+
+  return null
+}
+
+const selectById = (id: string, { scroll = false }: { scroll?: boolean } = {}) => {
+  const foundItem = getSelected(items.value, id)
+  if (!foundItem) return
+
+  const ancestors = getAncestorIds(items.value, id) ?? []
+  openedIds.value = [...new Set([...openedIds.value, ...ancestors])]
+  activatedIds.value = [id]
+  selected.value = foundItem
+
+  if (scroll) scrollToArticle(id)
+}
+
+const updateActivated = (ids: string[]) => {
+  if (!ids.length) {
+    selected.value = {}
+    return
+  }
+
+  selectById(ids[ids.length - 1], { scroll: false })
+}
+
+const collectOpenableIds = (nodes: DocumentationItem[]): string[] => {
+  const ids: string[] = []
+  for (const node of nodes) {
+    if (node.children?.length) {
+      ids.push(node.id)
+      ids.push(...collectOpenableIds(node.children))
+    }
+  }
+  return ids
+}
+
+const toggleOpenAll = () => {
+  if (isOpenAll.value) {
+    const currentId = selected.value?.id
+    openedIds.value = currentId
+      ? (getAncestorIds(items.value, currentId) ?? [])
+      : []
+    isOpenAll.value = false
+    return
+  }
+
+  openedIds.value = collectOpenableIds(filteredItems.value)
+  isOpenAll.value = true
+}
+
+const resetSelection = () => {
+  if (keepSelectionOnClose.value) {
+    keepSelectionOnClose.value = false
+    return
+  }
+  activatedIds.value = []
+  openedIds.value = []
+  isOpenAll.value = false
+  selected.value = {}
+}
+
+const scrollToArticle = (id: string) => {
+  setTimeout(() => {
+    const element = document.getElementById('doc_' + id)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, 0)
+}
+
+const getSelected = (nodes: DocumentationItem[] | DocumentationItem, id: string): DocumentationItem | null => {
+  // Приводим к массиву
+  const nodeArray = Array.isArray(nodes) ? nodes : [nodes]
+
+  if (!nodeArray.length) return null
+
+  for (const node of nodeArray) {
+    if (node && node.id === id) {
+      return node
+    }
+
+    if (node && node.children) {
+      const found = getSelected(node.children, id)
+      if (found) return found
+    }
+  }
+
+  return null
+}
+
+watch(items, (localizedItems) => {
+  const currentId = selected.value?.id
+  if (!currentId) return
+
+  const nextSelected = getSelected(localizedItems, currentId)
+  selected.value = nextSelected || {}
+  activatedIds.value = nextSelected ? [currentId] : []
+
+  if (nextSelected) {
+    const ancestors = getAncestorIds(localizedItems, currentId) ?? []
+    openedIds.value = [...new Set([...openedIds.value, ...ancestors])]
+  }
+})
+
+watch(() => dialogsStore.documentation, (isOpen) => {
+  if (isOpen && selected.value?.id) {
+    nextTick(() => selectById(selected.value.id!, { scroll: true }))
+  }
+})
+
+const handleShowDocumentation = (payload: unknown) => {
+  const id = payload as string
+  dialogs.value.documentation = true
+  nextTick(() => selectById(id, { scroll: true }))
+}
+
+let unregisterShowDocumentation: (() => void) | null = null
+
+onMounted(() => {
+  if (items.value?.length) {
+    selectById(items.value[0].id)
+  }
+
+  unregisterShowDocumentation = registerAppShellHandler('showDocumentation', handleShowDocumentation)
+})
+
+onBeforeUnmount(() => {
+  unregisterShowDocumentation?.()
+  unregisterShowDocumentation = null
+})
+</script>
+
+<style lang="scss">
+.documentation-container {
+  display: flex;
+  height: calc(100vh - 300px); /* Уменьшил отступ */
+  min-height: 400px;
+  max-height: 600px; /* Уменьшил максимальную высоту */
+  overflow: hidden;
+
+  /* Альтернативный подход - использовать 100% высоты родителя */
+  /* height: 100%; */
+}
+
+/* Левая колонка: TreeView */
+.treeview-column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 320px;
+  min-width: 250px;
+  max-width: 400px;
+  border-right: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  overflow: hidden;
+  height: 100%; /* Добавил 100% высоты */
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px; /* Уменьшил padding */
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgba(0, 0, 0, 0.02);
+  flex-shrink: 0;
+  min-height: 56px; /* Фиксированная минимальная высота */
+}
+
+.treeview-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.styled-treeview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  max-height: 100%; /* Ограничиваем высоту */
+}
+
+/* Правая колонка: Контент */
+.content-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%; /* Добавил 100% высоты */
+}
+
+.content-column.no-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-selection-placeholder {
+  text-align: center;
+  max-width: 400px;
+  padding: 20px; /* Уменьшил padding */
+  opacity: 0.7;
+}
+
+.selected-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 24px; /* Уменьшил вертикальный padding */
+  max-height: 100%; /* Ограничиваем высоту */
+}
+
+.content-header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px; /* Уменьшил отступ */
+  padding-bottom: 12px; /* Уменьшил padding */
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.header-right {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.content-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+/* Стили для HTML контента */
+.html-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(var(--v-theme-on-surface), 0.9);
+}
+
+.html-content h1,
+.html-content h2,
+.html-content h3 {
+  color: rgba(var(--v-theme-primary), 0.9);
+  margin: 24px 0 16px 0;
+  font-weight: 600;
+}
+
+.html-content h3 {
+  font-size: 1.1rem;
+  padding-bottom: 6px;
+  border-bottom: 2px solid rgba(var(--v-theme-primary), 0.2);
+}
+
+.html-content h3:first-child {
+  margin-top: 0;
+}
+
+.html-content ul,
+.html-content ol {
+  padding-left: 24px;
+  margin: 16px 0;
+}
+
+.html-content li {
+  margin: 8px 0;
+  padding-left: 4px;
+}
+
+.html-content p {
+  margin: 16px 0;
+}
+
+.html-content code {
+  background: rgba(var(--v-theme-primary), 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 0.9em;
+}
+
+.html-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 24px;
+}
+
+.html-content th,
+.html-content td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  text-align: left;
+  vertical-align: top;
+}
+
+.html-content th {
+  color: rgba(var(--v-theme-on-surface), 0.8);
+  font-weight: 600;
+}
+
+.html-content pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 16px 0;
+  border: 1px solid rgba(var(--v-border-color), 0.3);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .documentation-container {
+    flex-direction: column;
+    height: calc(100vh - 250px); /* Адаптивная высота для мобилок */
+    min-height: 300px;
+    max-height: none;
+  }
+
+  .treeview-column {
+    flex: 0 0 auto;
+    max-width: 100%;
+    max-height: 250px; /* Уменьшил высоту для мобилок */
+    border-right: none;
+    border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  }
+
+  .v-divider {
+    display: none;
+  }
+
+  .selected-content {
+    padding: 12px 16px; /* Уменьшил padding для мобилок */
+  }
+
+  .content-body {
+    max-height: calc(100% - 80px); /* Меньший отступ для мобилок */
+  }
+}
+
+@media (max-height: 700px) {
+  .documentation-container {
+    height: calc(100vh - 250px); /* Для маленьких экранов */
+    min-height: 300px;
+  }
+
+  .selected-content {
+    padding: 12px 16px;
+  }
+
+  .content-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+}
+</style>

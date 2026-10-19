@@ -1,0 +1,38 @@
+services:
+  mediachips:
+    # Published multi-arch image (Docker Hub). Alternatives:
+    #   ghcr.io/fupdec/mediachips:latest
+    # Local rebuild from this repo:
+    #   docker compose up -d --build
+    #   (uncomment `build: .` below and set image: mediachips:local)
+    image: vinsdoe/mediachips:latest
+    # build: .
+    container_name: mediachips
+    restart: unless-stopped
+    ports:
+      - "12321:12321"
+    volumes:
+      # Config + SQLite DBs + generated thumbs (persistent)
+      - ./docker-data:/data
+      # Mount host media libraries, then add them in the UI as /media/...
+      # Examples (uncomment and edit to your paths):
+      # - /Users/you/Movies:/media/movies
+      # - /volume1/video:/media/video
+      # - D:/Videos:/media/videos
+    environment:
+      - NODE_ENV=production
+      - TZ=${TZ:-UTC}
+      - PUID=${PUID:-1001}
+      - PGID=${PGID:-1001}
+      - MEDIA_CHIPS_ALLOW_LAN=1
+      - MEDIA_CHIPS_DATA_DIR=/data
+      # LAN/NAS IP for the home-page share link (phones). Example: 192.168.1.50
+      - MEDIA_CHIPS_PUBLIC_HOST=${MEDIA_CHIPS_PUBLIC_HOST:-}
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+      - FFPROBE_PATH=/usr/bin/ffprobe
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:12321/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

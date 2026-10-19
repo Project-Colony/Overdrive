@@ -1,0 +1,262 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { AppWebSocket } from '../types/websockets'
+import type { Request } from 'express'
+
+const {
+  watchFolders,
+  mockWatcher,
+  fullSync,
+  refreshDbPaths,
+  getReports,
+  reset,
+  setFolders,
+  syncFolderMetadata,
+} = vi.hoisted(() => {
+  const mockWatcher = {
+    on: vi.fn(),
+    close: vi.fn().mockResolvedValue(undefined),
+    notifyReady: vi.fn(),
+  }
+
+  return {
+    watchFolders: vi.fn(async () => mockWatcher),
+    mockWatcher,
+    fullSync: vi.fn().mockResolvedValue(undefined),
+    refreshDbPaths: vi.fn().mockResolvedValue(undefined),
+    getReports: vi.fn().mockReturnValue([{folder: {path: '/media'}, files: []}]),
+    reset: vi.fn(),
+    setFolders: vi.fn(),
+    syncFolderMetadata: vi.fn(),
+  }
+})
+
+vi.mock('./parcelFolderWatcher', () => ({
+  watchFolders,
+}))
+
+vi.mock('./watcherSync', () => ({
+  WatcherSyncEngine: vi.fn(function WatcherSyncEngine() {
+    return {
+      fullSync,
+      refreshDbPaths,
+      getReports,
+      reset,
+      setFolders,
+      syncFolderMetadata,
+      applyFileEvent: vi.fn().mockReturnValue(false),
+    }
+  }),
+}))
+
+import { createWatcherWsHandler } from './watcherWsHandler'
+
+type OutboundMessage = Record<string, unknown>
+
+type MockWebSocket = AppWebSocket & {
+  messages: OutboundMessage[]
+  emit: (event: string, ...args: unknown[]) => Promise<void>
+}
+
+function createMockWebSocket(): MockWebSocket {
+  const listeners = new Map<string, Array<(...args: unknown[]) => void | Promise<void>>>()
+
+  const ws: MockWebSocket = {
+    readyState: 1,
+    messages: [],
+    send(data: string) {
+      ws.messages.push(JSON.parse(data) as OutboundMessage)
+    },
+    close: vi.fn(),
+    on(event: string, listener: (...args: unknown[]) => void) {
+      const current = listeners.get(event) || []
+      current.push(listener)
+      listeners.set(event, current)
+    },
+    async emit(event: string, ...args: unknown[]) {
+      for (const listener of listeners.get(event) || []) {
+        await listener(...args)
+      }
+    },
+  }
+
+  return ws
+}
+
+function triggerWatcherEvent(event: string, ...args: unknown[]) {
+  const handler = mockWatcher.on.mock.calls.find(([name]) => name === event)?.[1] as
+    | ((...handlerArgs: unknown[]) => void | Promise<void>)
+    | undefined
+
+  if (!handler) {
+    throw new Error(`Watcher handler for "${event}" was not registered`)
+  }
+
+  return handler(...args)
+}
+
+async function flushWatcherStart() {
+  await vi.waitFor(() => {
+    expect(watchFolders).toHaveBeenCalled()
+    expect(mockWatcher.notifyReady).toHaveBeenCalled()
+  })
+}
+
+describe('createWatcherWsHandler', () => {
+  const db = {drizzle: {}} as never
+  const req = {} as Request
+  const folders = [{
+    path: '/media/movies',
+    types: [{id: 1, extensions: 'mp4'}],
+  }]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockWatcher.on.mockImplementation(function mockOn(this: typeof mockWatcher) {
+      return this
+    })
+    fullSync.mockResolvedValue(undefined)
+    refreshDbPaths.mockResolvedValue(undefined)
+    getReports.mockReturnValue([{folder: {path: '/media/movies'}, files: []}])
+    watchFolders.mockResolvedValue(mockWatcher)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('starts parcel watcher and sends file reports after ready', async () => {
+    const ws = createMockWebSocket()
+    createWatcherWsHandler(db)(ws, req)
+
+    await ws.emit('message', JSON.stringify({
+      type: 'start',
+      folders,
+      extensions: {'/media/movies': ['mp4']},
+    }))
+    await flushWatcherStart()
+
+    expect(watchFolders).toHaveBeenCalledWith({
+      folderPaths: ['/media/movies'],
+      extensionsByFolder: {'/media/movies': ['mp4']},
+      excludedPaths: [],
+    })
+    expect(refreshDbPaths).not.toHaveBeenCalled()
+    await triggerWatcherEvent('ready')
+    expect(fullSync).toHaveBeenCalledWith(folders)
+    expect(ws.messages.some((message) => message.type === 'scanStart')).toBe(true)
+    expect(ws.messages.some((message) => message.type === 'scanComplete')).toBe(true)
+    expect(ws.messages.some((message) => message.type === 'files')).toBe(true)
+    expect(ws.messages[ws.messages.length - 1]?.type).toBe('scanComplete')
+  })
+
+  it('stops the watcher and sends closed', async () => {
+    const ws = createMockWebSocket()
+    createWatcherWsHandler(db)(ws, req)
+
+    await ws.emit('message', JSON.stringify({
+      type: 'start',
+      folders,
+      extensions: {'/media/movies': ['mp4']},
+    }))
+    await flushWatcherStart()
+
+    await ws.emit('message', JSON.stringify({type: 'stop'}))
+
+    expect(mockWatcher.close).toHaveBeenCalled()
+    expect(reset).toHaveBeenCalled()
+    expect(ws.messages[ws.messages.length - 1]).toEqual({type: 'closed'})
+  })
+
+  it('refreshes the database when folder config is unchanged', async () => {
+    const ws = createMockWebSocket()
+    createWatcherWsHandler(db)(ws, req)
+
+    await ws.emit('message', JSON.stringify({
+      type: 'start',
+      folders,
+      extensions: {'/media/movies': ['mp4']},
+    }))
+    await flushWatcherStart()
+    await triggerWatcherEvent('ready')
+
+    vi.clearAllMocks()
+    getReports.mockReturnValue([{folder: {path: '/media/movies'}, files: []}])
+    watchFolders.mockResolvedValue(mockWatcher)
+    mockWatcher.on.mockImplementation(function mockOn(this: typeof mockWatcher) {
+      return this
+    })
+
+    await ws.emit('message', JSON.stringify({
+      type: 'update',
+      folders,
+      extensions: {'/media/movies': ['mp4', 'mkv']},
+    }))
+
+    expect(refreshDbPaths).toHaveBeenCalled()
+    expect(syncFolderMetadata).toHaveBeenCalledWith(folders)
+    expect(setFolders).not.toHaveBeenCalled()
+    expect(watchFolders).not.toHaveBeenCalled()
+    expect(ws.messages[ws.messages.length - 1]).toEqual({
+      type: 'files',
+      data: [{folder: {path: '/media/movies'}, files: []}],
+    })
+  })
+
+  it('refreshes the database on explicit refresh requests', async () => {
+    const ws = createMockWebSocket()
+    createWatcherWsHandler(db)(ws, req)
+
+    await ws.emit('message', JSON.stringify({
+      type: 'start',
+      folders,
+      extensions: {'/media/movies': ['mp4']},
+    }))
+    await flushWatcherStart()
+    await triggerWatcherEvent('ready')
+
+    vi.clearAllMocks()
+    getReports.mockReturnValue([{folder: {path: '/media/movies'}, files: []}])
+
+    await ws.emit('message', JSON.stringify({type: 'refresh'}))
+
+    expect(refreshDbPaths).toHaveBeenCalled()
+    expect(ws.messages[ws.messages.length - 1]).toEqual({
+      type: 'files',
+      data: [{folder: {path: '/media/movies'}, files: []}],
+    })
+  })
+
+  it('runs a full sync on explicit rescan requests', async () => {
+    const ws = createMockWebSocket()
+    createWatcherWsHandler(db)(ws, req)
+
+    await ws.emit('message', JSON.stringify({
+      type: 'start',
+      folders,
+      extensions: {'/media/movies': ['mp4']},
+    }))
+    await flushWatcherStart()
+    await triggerWatcherEvent('ready')
+
+    vi.clearAllMocks()
+    fullSync.mockResolvedValue(undefined)
+    getReports.mockReturnValue([{folder: {path: '/media/movies'}, files: []}])
+
+    await ws.emit('message', JSON.stringify({type: 'rescan'}))
+
+    expect(fullSync).toHaveBeenCalledWith(folders)
+    expect(ws.messages.some((message) => message.type === 'scanStart')).toBe(true)
+    expect(ws.messages.some((message) => message.type === 'scanComplete')).toBe(true)
+    expect(ws.messages.some((message) => message.type === 'files')).toBe(true)
+  })
+
+  it('ignores invalid JSON without crashing', async () => {
+    const ws = createMockWebSocket()
+    createWatcherWsHandler(db)(ws, req)
+
+    await ws.emit('message', '{bad-json')
+
+    expect(watchFolders).not.toHaveBeenCalled()
+    expect(ws.messages).toEqual([])
+  })
+})

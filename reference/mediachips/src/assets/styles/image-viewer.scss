@@ -1,0 +1,671 @@
+.dialog-image-viewer {
+  margin: 24px;
+  width: min(1800px, calc(100vw - 48px));
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+}
+
+.v-dialog--fullscreen .dialog-image-viewer {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-viewer {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: min(960px, calc(100vw - 48px));
+  height: min(90vh, calc(100vh - 48px));
+  min-height: min(560px, calc(100vh - 48px));
+  background: #111;
+  color: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+
+  &.fullscreen {
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  &:fullscreen,
+  &:-webkit-full-screen {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  &--chrome-hidden {
+    .image-viewer__toolbar,
+    .image-viewer__dock,
+    .image-viewer__nav,
+    .image-viewer__bottom {
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+
+  &__toolbar,
+  &__dock,
+  &__nav,
+  &__control-pill,
+  &__title {
+    transition: opacity 0.25s ease;
+  }
+
+  &__bottom {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+
+  &__slideshow-progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    z-index: 4;
+    width: 100%;
+    height: 3px;
+    transform-origin: left center;
+    background: rgb(var(--v-theme-primary));
+    pointer-events: none;
+    animation: image-viewer-slideshow-progress var(--slideshow-ms, 4s) linear forwards;
+  }
+
+  /* Glass surfaces over the photo (stage fills the viewer). */
+  &__stage {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    background:
+      radial-gradient(circle at center, rgba(255, 255, 255, 0.04) 0, transparent 55%),
+      #000;
+    user-select: none;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &__toolbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    flex-wrap: wrap;
+    background: transparent;
+    pointer-events: none;
+
+    > * {
+      pointer-events: auto;
+    }
+  }
+
+  &__toolbar-groups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  &__title {
+    min-width: 0;
+    max-width: min(40%, 420px);
+    padding: 8px 14px;
+    border-radius: 16px;
+    background: rgba(12, 12, 16, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(18px) saturate(1.35);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  }
+
+  &__control-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(12, 12, 16, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(18px) saturate(1.35);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+
+    .v-btn {
+      opacity: 0.94;
+
+      &:hover {
+        opacity: 1;
+      }
+
+      &.v-btn--disabled {
+        opacity: 0.35;
+      }
+    }
+  }
+
+  &__zoom-label {
+    min-width: 52px;
+    letter-spacing: 0.02em;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  &__group {
+    flex-wrap: nowrap;
+  }
+
+  &__name {
+    font-size: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__counter {
+    font-size: 0.8rem;
+    opacity: 0.75;
+  }
+
+  &__nav {
+    position: absolute;
+    top: 50%;
+    z-index: 3;
+    transform: translateY(-50%);
+    width: 52px !important;
+    height: 52px !important;
+    opacity: 0.92;
+    color: #fff !important;
+    background: rgba(12, 12, 16, 0.38) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(18px) saturate(1.35);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+
+    .v-icon {
+      color: #fff !important;
+      opacity: 0.95;
+    }
+
+    &:hover {
+      opacity: 1;
+      background: rgba(12, 12, 16, 0.5) !important;
+    }
+
+    &.v-btn--disabled {
+      opacity: 0.35;
+    }
+
+    &--prev {
+      left: 12px;
+    }
+
+    &--next {
+      right: 12px;
+    }
+  }
+
+  &__loading-badge {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(12, 12, 16, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(18px) saturate(1.35);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    pointer-events: none;
+  }
+
+  &__image-stack {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    // Receive pointer events so click-drag pan works on the image area.
+    pointer-events: auto;
+    touch-action: none;
+  }
+
+  &__image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transform-origin: center center;
+    will-change: transform, opacity;
+    pointer-events: none;
+
+    &--loading {
+      opacity: 0.88;
+    }
+  }
+
+  &__dock {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(12, 12, 16, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(18px) saturate(1.35);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    transform: translateX(-50%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  }
+
+  &__dock-zoom {
+    min-width: 52px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  &__dock-divider {
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  &__bottom {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 16px;
+    background: rgba(12, 12, 16, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(18px) saturate(1.35);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  &__section {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 0.28s cubic-bezier(0.33, 1, 0.68, 1),
+      opacity 0.2s ease,
+      margin 0.28s cubic-bezier(0.33, 1, 0.68, 1);
+
+    &--open {
+      grid-template-rows: 1fr;
+      opacity: 1;
+    }
+
+    &--open + &--open {
+      margin-top: 8px;
+    }
+  }
+
+  &__section-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  &__filmstrip {
+    position: relative;
+    z-index: 0;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+    }
+  }
+
+  &__filmstrip-track {
+    position: relative;
+    height: 54px;
+  }
+
+  &__filmstrip-item {
+    position: absolute;
+    top: 0;
+    width: 72px;
+    height: 54px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    opacity: 0.72;
+    transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+
+    &:hover {
+      opacity: 1;
+      transform: translateY(-1px);
+    }
+
+    &--active {
+      opacity: 1;
+      border-color: rgb(var(--v-theme-primary));
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+    }
+  }
+
+  &__filmstrip-thumb {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+  }
+
+  &__filmstrip-placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background:
+      linear-gradient(110deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.12) 37%, rgba(255, 255, 255, 0.04) 63%);
+    background-size: 200% 100%;
+    animation: image-viewer-filmstrip-shimmer 1.2s ease-in-out infinite;
+  }
+
+  &__error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+  }
+
+  &__info {
+    position: relative;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 2px 2px 0;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.82);
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  &__section--open + &__section--open .image-viewer__info {
+    padding-top: 6px;
+  }
+
+  &__info-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__info-empty {
+    opacity: 0.65;
+  }
+
+  &__info-copy {
+    flex: 0 0 auto;
+    opacity: 0.85;
+  }
+
+  &__shortcuts {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  &__shortcuts-card {
+    width: min(420px, 100%);
+    padding: 20px;
+    border-radius: 16px;
+    background: rgba(16, 16, 22, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(22px) saturate(1.35);
+    -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  }
+
+  &__shortcuts-title {
+    margin-bottom: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  &__shortcuts-list {
+    list-style: none;
+    margin: 0 0 16px;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    kbd {
+      flex: 0 0 auto;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+  }
+
+  &__playlist-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.9rem;
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .dialog-image-viewer {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .image-viewer {
+    height: 100vh;
+    border-radius: 0;
+
+    &__toolbar-groups {
+      .image-viewer__control-pill--desktop {
+        display: none;
+      }
+    }
+
+    &__dock {
+      bottom: 12px;
+      max-width: calc(100vw - 24px);
+      overflow-x: auto;
+    }
+
+    &__bottom {
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+    }
+
+    &__filmstrip-track {
+      height: 54px;
+    }
+
+    &__filmstrip-item {
+      width: 72px;
+      height: 54px;
+    }
+
+    &__title {
+      max-width: 55%;
+    }
+  }
+}
+
+/* Desktop: top toolbar is enough; dock is for compact/mobile. */
+@media (min-width: 721px) {
+  .image-viewer__dock {
+    display: none;
+  }
+}
+
+/* Keep mobile dock above the shared bottom panel. */
+@media (max-width: 720px) {
+  .image-viewer:has(.image-viewer__bottom--filmstrip):not(:has(.image-viewer__bottom--info)) .image-viewer__dock {
+    bottom: 92px;
+  }
+
+  .image-viewer:has(.image-viewer__bottom--filmstrip):has(.image-viewer__bottom--info) .image-viewer__dock {
+    bottom: 136px;
+  }
+
+  .image-viewer:has(.image-viewer__bottom--info):not(:has(.image-viewer__bottom--filmstrip)) .image-viewer__dock {
+    bottom: 64px;
+  }
+}
+
+@keyframes image-viewer-slideshow-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes image-viewer-filmstrip-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.image-viewer-bottom-enter-active,
+.image-viewer-bottom-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease !important;
+}
+
+.image-viewer-bottom-enter-from,
+.image-viewer-bottom-leave-to {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-viewer__section {
+    transition: none;
+  }
+}
+
+.image-viewer-fade-enter-active,
+.image-viewer-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.image-viewer-fade-enter-from,
+.image-viewer-fade-leave-to {
+  opacity: 0;
+}
+
+.image-viewer-crossfade-enter-active,
+.image-viewer-crossfade-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.image-viewer-crossfade-leave-active {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-viewer-crossfade-enter-from,
+.image-viewer-crossfade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-viewer-crossfade-enter-active,
+  .image-viewer-crossfade-leave-active,
+  .image-viewer__slideshow-progress,
+  .image-viewer__filmstrip-placeholder {
+    transition: none;
+    animation: none;
+  }
+}

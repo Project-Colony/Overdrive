@@ -1,0 +1,535 @@
+import type { ApiDb, FilterLike } from '../types/db'
+import { apiErrorMessage, sendControllerError, sendNotFound, sendOk } from '../types/errors'
+import type { ApiRequest, ApiResponse } from '../types/http'
+import { getRequestBody } from '../types/http'
+import type { ItemsListRequest, DeleteEntityOnePayload, EntityUpdatePayload } from '@shared/api/responses'
+import type {
+  MediaDuplicateGroupsPayload,
+  MediaPathUpdatePayload,
+  MediaThumbsRequestPayload,
+  MergeMediaPayload,
+} from '@shared/api/payloads'
+import {
+  listMediaDuplicateGroups,
+} from '../services/mediaDuplicateGroups'
+import {mergeMediaItems} from '../services/mediaMerge'
+import {browseLibraryFolders} from '../services/mediaFolderBrowse'
+import { createMediaRepository } from '../db/repositories/media'
+import { createMediaTypesRepository } from '../db/repositories/mediaTypes'
+import path from 'path'
+import { parseMediaFilePath } from '../../shared/mediaPath'
+import {
+  deleteMediaGeneratedAssets,
+  unlinkResolvedPath,
+} from '../services/localAssetCleanup'
+import {
+  loadMediaItems,
+  loadFilteredMediaIds,
+  loadMediaBasicsByIds,
+} from '../services/mediaItemsLoader'
+import {findVisualSimilarIds} from '../services/visualHashBackfill'
+import {
+  suggestTagsFromSimilarForMedia,
+  suggestTagsFromSimilarForMediaIds,
+} from '../services/suggestTagsFromSimilar'
+import {
+  findSimilarByClip,
+  semanticSearchMedia,
+} from '../services/mediaClipEmbeddings'
+import {findSimilarHybrid} from '../services/mediaHybridSimilarity'
+import {getClipEmbeddingStatus} from '../services/clipEmbeddingModel'
+import { invalidateMediaDerivedCaches } from '../services/mediaCacheInvalidation'
+import {
+  mapWithConcurrency,
+  readFirstExistingImageDataUrl,
+} from '../services/thumbEncoding'
+import { getZipArchivePath, isVirtualZipPath } from '../../shared/zipPath'
+import {
+  countTrashMedia,
+  getTrashMediaForPurge,
+  listExpiredTrashIds,
+  listTrashMedia,
+  restoreTrashMedia,
+  softDeleteMedia,
+} from '../services/mediaTrash'
+import { MEDIA_TRASH_RETENTION_DAYS } from '../../shared/mediaTrash'
+
+export default function (db: ApiDb) {
+  const mediaRepo = createMediaRepository(db.drizzle)
+  const mediaTypesRepo = createMediaTypesRepository(db.drizzle)
+  const getDbPath = () => db.path!
+
+  const hardDeleteTargets = async function (
+    targets: Array<Record<string, unknown>>,
+    body: DeleteEntityOnePayload,
+  ) {
+    const deletedIds: number[] = []
+    for (const target of targets) {
+      const targetId = Number(target.id)
+      if (!Number.isFinite(targetId) || targetId <= 0) continue
+
+      const mediaType = target.mediaTypeId
+        ? mediaTypesRepo.findById(Number(target.mediaTypeId))
+        : undefined
+
+      await deleteMediaGeneratedAssets(db, getDbPath(), {id: target.id}, mediaType?.type || '')
+
+      const purgePath = String(
+        target.trashOriginalPath
+        || target.path
+        || body.path
+        || '',
+      )
+      const shouldUnlinkFile = Boolean(body.with_file || target.trashPurgeFile)
+        && Boolean(purgePath)
+        && !isVirtualZipPath(purgePath)
+
+      if (shouldUnlinkFile) {
+        try {
+          const deleted = await unlinkResolvedPath(purgePath)
+          if (!deleted) {
+            console.log(`${purgePath} is unavailable.`)
+          }
+        } catch (error) {
+          console.error(`Failed to delete media file ${purgePath}:`, apiErrorMessage(error))
+        }
+      }
+
+      mediaRepo.deleteById(targetId)
+      deletedIds.push(targetId)
+    }
+    return deletedIds
+  }
+
+  const getAll = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<ItemsListRequest>(req)
+      const ids = Array.isArray(body.ids) ? body.ids.filter(Boolean) : []
+      const limit = Number(body.limit)
+      const page = Number(body.page) || 1
+
+      const result = await loadMediaItems(db, {
+        mediaTypeId: body.mediaTypeId,
+        ids,
+        filters: body.filters as unknown as FilterLike[] | undefined,
+        filtersJoin: body.filtersJoin === 'or' ? 'or' : 'and',
+        sortBy: body.sortBy,
+        direction: body.direction,
+        find_duplicates: body.find_duplicates,
+        duplicates_by: body.duplicates_by || 'filesize',
+        page,
+        limit: limit > 0 ? limit : null,
+        includeNavigation: body.includeNavigation === true && !ids.length,
+        skipTotals: body.skipTotals === true,
+        groupBy: body.groupBy,
+      })
+
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, "Some error occurred while retrieving media.")
+    }
+  };
+
+  const folderBrowse = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{path?: string | null; mediaTypeId?: number | null}>(req)
+      const result = await browseLibraryFolders(db, {
+        path: body.path,
+        mediaTypeId: body.mediaTypeId,
+      })
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while browsing library folders.')
+    }
+  }
+
+  const getFilteredIds = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<ItemsListRequest>(req)
+      const result = await loadFilteredMediaIds(db, {
+        mediaTypeId: body.mediaTypeId,
+        filters: body.filters as unknown as FilterLike[] | undefined,
+        filtersJoin: body.filtersJoin === 'or' ? 'or' : 'and',
+        sortBy: body.sortBy,
+        direction: body.direction,
+        find_duplicates: body.find_duplicates,
+        duplicates_by: body.duplicates_by || 'filesize',
+        includeNavigation: body.includeNavigation === true,
+        skipTotals: body.skipTotals === true,
+      })
+
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while retrieving media ids.')
+    }
+  }
+
+  const similarByVisual = function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{seedId?: number, limit?: number}>(req)
+      const seedId = Number(body.seedId)
+      const parsedLimit = body.limit == null ? NaN : Number(body.limit)
+      const result = findVisualSimilarIds(db, seedId, {
+        ...(Number.isFinite(parsedLimit) && parsedLimit > 0 ? {limit: parsedLimit} : {}),
+      })
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while finding similar media.')
+    }
+  }
+
+  const suggestTagsFromSimilar = function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{
+        seedId?: number
+        mediaIds?: Array<number | string>
+        neighborLimit?: number
+        tagLimit?: number
+        minCount?: number
+        apply?: boolean
+      }>(req)
+      const options = {
+        neighborLimit: body.neighborLimit,
+        tagLimit: body.tagLimit,
+        minCount: body.minCount,
+        apply: Boolean(body.apply),
+      }
+      const mediaIds = Array.isArray(body.mediaIds) ? body.mediaIds : []
+      if (mediaIds.length) {
+        sendOk(res, suggestTagsFromSimilarForMediaIds(db, mediaIds, options))
+        return
+      }
+      const seedId = Number(body.seedId)
+      if (!Number.isFinite(seedId) || seedId <= 0) {
+        sendControllerError(res, new Error('seedId or mediaIds is required'), 'seedId or mediaIds is required')
+        return
+      }
+      sendOk(res, suggestTagsFromSimilarForMedia(db, seedId, options))
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while suggesting tags from similar media.')
+    }
+  }
+
+  const semanticSearch = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{
+        query?: string
+        mediaTypeId?: number | string | null
+        limit?: number
+        locale?: string | null
+      }>(req)
+      const mediaTypeId = body.mediaTypeId == null ? null : Number(body.mediaTypeId)
+      const parsedLimit = body.limit == null ? NaN : Number(body.limit)
+      const locale = body.locale == null ? null : String(body.locale)
+      const result = await semanticSearchMedia(db, {
+        query: String(body.query || ''),
+        mediaTypeId: Number.isFinite(mediaTypeId as number) ? mediaTypeId : null,
+        ...(Number.isFinite(parsedLimit) && parsedLimit > 0 ? {limit: parsedLimit} : {}),
+        locale,
+      })
+      const model = getClipEmbeddingStatus(db)
+      sendOk(res, {
+        ...result,
+        modelStatus: result.modelStatus || model.status,
+      })
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while running semantic search.')
+    }
+  }
+
+  const similarByClip = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{seedId?: number, limit?: number}>(req)
+      const seedId = Number(body.seedId)
+      const parsedLimit = body.limit == null ? NaN : Number(body.limit)
+      const result = await findSimilarByClip(db, seedId, {
+        ...(Number.isFinite(parsedLimit) && parsedLimit > 0 ? {limit: parsedLimit} : {}),
+      })
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while finding semantically similar media.')
+    }
+  }
+
+  const similarHybrid = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{seedId?: number, limit?: number}>(req)
+      const seedId = Number(body.seedId)
+      const parsedLimit = body.limit == null ? NaN : Number(body.limit)
+      const result = await findSimilarHybrid(db, seedId, {
+        encodeSeedIfMissing: true,
+        ...(Number.isFinite(parsedLimit) && parsedLimit > 0 ? {limit: parsedLimit} : {}),
+      })
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while finding similar media.')
+    }
+  }
+
+  const merge = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<MergeMediaPayload>(req)
+      const result = await mergeMediaItems(db, {
+        survivorId: Number(body.survivorId),
+        sourceIds: Array.isArray(body.sourceIds) ? body.sourceIds : [],
+        withFile: Boolean(body.with_file),
+      })
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while merging media.')
+    }
+  }
+
+  const duplicateGroups = function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<MediaDuplicateGroupsPayload>(req)
+      const mediaTypeId = body.mediaTypeId == null ? null : Number(body.mediaTypeId)
+      const result = listMediaDuplicateGroups(db, {
+        duplicatesBy: String(body.duplicates_by || 'filesize'),
+        mediaTypeId: Number.isFinite(mediaTypeId as number) ? mediaTypeId : null,
+      })
+      sendOk(res, result)
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while listing duplicate groups.')
+    }
+  }
+
+  const getBasicsByIds = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const ids = Array.isArray(req.body.ids) ? req.body.ids.filter(Boolean) : []
+      const items = await loadMediaBasicsByIds(db, ids)
+      sendOk(res, {items})
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while retrieving media.')
+    }
+  }
+
+  const getThumbs = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<MediaThumbsRequestPayload>(req)
+      const ids = Array.isArray(body.ids) ? body.ids.filter(Boolean) : []
+      const mediaType = String(body.mediaType || 'videos')
+      const basePath = path.join(getDbPath(), 'media', mediaType)
+
+      const entries = await mapWithConcurrency(ids, 8, async (id) => {
+        const dataUrl = await readFirstExistingImageDataUrl(basePath, id, ['thumbs', 'grids'])
+        return dataUrl ? [String(id), dataUrl] as const : null
+      })
+
+      const thumbs: Record<string, string> = {}
+      for (const entry of entries) {
+        if (entry) {
+          const [id, dataUrl] = entry
+          thumbs[id] = dataUrl
+        }
+      }
+
+      sendOk(res, {thumbs})
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while retrieving thumbnails.')
+    }
+  }
+
+  const getStats = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      sendOk(res, mediaRepo.getStats(db))
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while performing query.')
+    }
+  }
+
+  const getOneById = function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const data = mediaRepo.findById(Number(req.params.id)) ?? null
+      sendOk(res, data)
+    } catch (err) {
+      sendControllerError(res, err, "Some error occurred while retrieving media.")
+    }
+  };
+
+  const numberOfMediaWithTag = function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const count = mediaRepo.countWithTag(req.query.tagId)
+      sendOk(res, {count})
+    } catch (err) {
+      sendControllerError(res, err, "Some error occurred while performing query.")
+    }
+  };
+
+  const updatePath = function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<MediaPathUpdatePayload>(req)
+      const data = parseMediaFilePath(String(body.path ?? ''))
+
+      mediaRepo.updateById(Number(body.id), data, {silent: true})
+      invalidateMediaDerivedCaches()
+      sendOk(res, [1])
+    } catch (err) {
+      sendControllerError(res, err, "Some error occurred while retrieving media.")
+    }
+  };
+
+  const update = function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<EntityUpdatePayload>(req)
+      mediaRepo.updateById(Number(req.params.id), body, {silent: Boolean(body.silent)})
+      invalidateMediaDerivedCaches()
+      sendOk(res, [1])
+    } catch (err: unknown) {
+      sendControllerError(res, err, 'Some error occurred while retrieving media.')
+    }
+  }
+
+  const deleteOne = async function (req: ApiRequest, res: ApiResponse) {
+    const body = getRequestBody<DeleteEntityOnePayload>(req)
+    const id = body.id
+
+    try {
+      const media = mediaRepo.findById(Number(id))
+
+      if (!media) {
+        return sendNotFound(res, 'Media not found.')
+      }
+
+      const mediaPath = String(media.path || body.path || '')
+      const deleteZipGallery = Boolean(body.delete_zip_gallery) && isVirtualZipPath(mediaPath)
+      const zipArchivePath = deleteZipGallery ? getZipArchivePath(mediaPath) : null
+      const deleteZipFile = Boolean(body.delete_zip_file) && Boolean(zipArchivePath)
+      // ZIP gallery / permanent flag keep the previous hard-delete path.
+      const permanent = Boolean(body.permanent) || deleteZipGallery
+
+      const targets = (() => {
+        if (!zipArchivePath) return [media]
+        const gallery = mediaRepo.findByZipArchivePrefix(zipArchivePath)
+        return gallery.length ? gallery : [media]
+      })()
+
+      if (!permanent) {
+        const deletedIds: number[] = []
+        for (const target of targets) {
+          const targetId = Number(target.id)
+          if (!Number.isFinite(targetId) || targetId <= 0) continue
+          softDeleteMedia(db, targetId, {purgeFile: Boolean(body.with_file)})
+          deletedIds.push(targetId)
+        }
+        invalidateMediaDerivedCaches()
+        return sendOk(res, {deletedIds, softDeleted: true, zipFileDeleted: false})
+      }
+
+      const deletedIds = await hardDeleteTargets(targets as Array<Record<string, unknown>>, body)
+
+      let zipFileDeleted = false
+      if (deleteZipFile && zipArchivePath) {
+        try {
+          zipFileDeleted = Boolean(await unlinkResolvedPath(zipArchivePath))
+          if (!zipFileDeleted) {
+            console.log(`ZIP archive unavailable for delete: ${zipArchivePath}`)
+          }
+        } catch (error) {
+          console.error(`Failed to delete ZIP archive ${zipArchivePath}:`, apiErrorMessage(error))
+        }
+      }
+
+      invalidateMediaDerivedCaches()
+      sendOk(res, { deletedIds, softDeleted: false, zipFileDeleted })
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while performing query.')
+    }
+  };
+
+  const listTrash = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const limitRaw = (req.query as {limit?: string | number} | undefined)?.limit
+      const limit = Number(limitRaw)
+      const items = listTrashMedia(db, Number.isFinite(limit) ? limit : 200)
+      sendOk(res, {
+        items,
+        count: countTrashMedia(db),
+        retentionDays: MEDIA_TRASH_RETENTION_DAYS,
+      })
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while listing trash.')
+    }
+  }
+
+  const restoreTrash = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{ids?: Array<number | string>}>(req)
+      const ids = (body.ids || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+      const restoredIds = restoreTrashMedia(db, ids)
+      invalidateMediaDerivedCaches()
+      sendOk(res, {restoredIds})
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while restoring trash.')
+    }
+  }
+
+  const purgeTrash = async function (req: ApiRequest, res: ApiResponse) {
+    try {
+      const body = getRequestBody<{ids?: Array<number | string>}>(req)
+      const ids = (body.ids || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+      const targets = getTrashMediaForPurge(db, ids).map((item) => ({
+        id: item.id,
+        path: item.path,
+        trashOriginalPath: item.originalPath,
+        trashPurgeFile: item.purgeFile,
+        mediaTypeId: item.mediaTypeId,
+        basename: item.basename,
+        name: item.name,
+      }))
+      const deletedIds = await hardDeleteTargets(targets, {id: 0, with_file: false})
+      invalidateMediaDerivedCaches()
+      sendOk(res, {deletedIds})
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while purging trash.')
+    }
+  }
+
+  const purgeExpiredTrash = async function (_req: ApiRequest, res: ApiResponse) {
+    try {
+      const ids = listExpiredTrashIds(db)
+      if (!ids.length) {
+        return sendOk(res, {deletedIds: [] as number[]})
+      }
+      const targets = getTrashMediaForPurge(db, ids).map((item) => ({
+        id: item.id,
+        path: item.path,
+        trashOriginalPath: item.originalPath,
+        trashPurgeFile: item.purgeFile,
+        mediaTypeId: item.mediaTypeId,
+        basename: item.basename,
+        name: item.name,
+      }))
+      const deletedIds = await hardDeleteTargets(targets, {id: 0, with_file: false})
+      invalidateMediaDerivedCaches()
+      sendOk(res, {deletedIds})
+    } catch (err) {
+      sendControllerError(res, err, 'Some error occurred while purging expired trash.')
+    }
+  }
+
+  return {
+    numberOfMediaWithTag,
+    updatePath,
+    update,
+    deleteOne,
+    listTrash,
+    restoreTrash,
+    purgeTrash,
+    purgeExpiredTrash,
+    getOneById,
+    getAll,
+    folderBrowse,
+    getFilteredIds,
+    getBasicsByIds,
+    getThumbs,
+    getStats,
+    similarByVisual,
+    suggestTagsFromSimilar,
+    semanticSearch,
+    similarByClip,
+    similarHybrid,
+    merge,
+    duplicateGroups,
+  }
+}

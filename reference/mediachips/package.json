@@ -1,0 +1,284 @@
+{
+  "name": "mediachips",
+  "productName": "MediaChips",
+  "version": "1.12.0",
+  "author": {
+    "name": "MediaChips contributors"
+  },
+  "homepage": "https://mediachips.app",
+  "description": "Organize your media files with ease and convenience.",
+  "private": false,
+  "license": "GPL-3.0",
+  "repository": "github:fupdec/MediaChips",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "build:analyze": "ANALYZE=1 npm run build",
+    "build:app": "vite build",
+    "build:sfw": "MEDIA_CHIPS_SFW=1 vite build",
+    "build:store": "MEDIA_CHIPS_SFW=1 vite build",
+    "server": "node scripts/run-server.mjs",
+    "server:lan": "node scripts/run-server.mjs --lan",
+    "server:dev": "nodemon --watch app --watch api --watch shared --ext ts --delay 1 --ignore shared/sfwCompiled.ts --ignore shared/msStoreCompiled.ts --exec \"node scripts/run-server.mjs --prepare && node .backend-build/app/server.js\"",
+    "electron": "node scripts/electron-dev.mjs",
+    "electron:built": "node scripts/electron-built.mjs",
+    "pack": "node scripts/dist.mjs --dir",
+    "dist": "node scripts/dist.mjs",
+    "dist:sfw": "MEDIA_CHIPS_SFW=1 node scripts/dist.mjs",
+    "dist:store": "MEDIA_CHIPS_SFW=1 node scripts/dist.mjs --store",
+    "dist:msstore": "MEDIA_CHIPS_SFW=1 MEDIA_CHIPS_MSSTORE=1 node scripts/dist.mjs --msstore",
+    "portable": "node scripts/dist.mjs --win-portable",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
+    "test": "node scripts/ensure-sqlite-tests.mjs && vitest run",
+    "test:plugin-adult": "vitest run packages/plugin-adult",
+    "test:plugin-stash": "vitest run packages/plugin-stash",
+    "test:plugin-jellyfin": "vitest run packages/plugin-jellyfin",
+    "test:plugin-plex": "vitest run packages/plugin-plex",
+    "test:plugin-emby": "vitest run packages/plugin-emby",
+    "test:plugin-tmdb": "vitest run packages/plugin-tmdb",
+    "pack:plugin-adult": "node scripts/pack-plugin-adult.mjs",
+    "pack:plugin-stash": "node scripts/pack-plugin-stash.mjs",
+    "pack:plugin-jellyfin": "node scripts/pack-plugin-jellyfin.mjs",
+    "pack:plugin-plex": "node scripts/pack-plugin-plex.mjs",
+    "pack:plugin-emby": "node scripts/pack-plugin-emby.mjs",
+    "pack:plugin-tmdb": "node scripts/pack-plugin-tmdb.mjs",
+    "pack:plugins": "npm run pack:plugin-adult && npm run pack:plugin-stash && npm run pack:plugin-jellyfin && npm run pack:plugin-plex && npm run pack:plugin-emby && npm run pack:plugin-tmdb",
+    "build:chip-recipe-index": "node scripts/build-chip-recipe-index.mjs",
+    "postinstall": "node scripts/postinstall.mjs"
+  },
+  "main": "electron/runMain.js",
+  "overrides": {
+    "sharp": "^0.35.3",
+    "onnxruntime-node": "$onnxruntime-node",
+    "tar": "7.5.22",
+    "protobufjs": "8.7.2",
+    "esbuild": "^0.28.1"
+  },
+  "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "@mediachips/plugin-adult": "file:packages/plugin-adult",
+    "@mediachips/plugin-emby": "file:packages/plugin-emby",
+    "@mediachips/plugin-jellyfin": "file:packages/plugin-jellyfin",
+    "@mediachips/plugin-plex": "file:packages/plugin-plex",
+    "@mediachips/plugin-stash": "file:packages/plugin-stash",
+    "@mediachips/plugin-tmdb": "file:packages/plugin-tmdb",
+    "@parcel/watcher": "^2.6.0",
+    "@xenova/transformers": "^2.17.2",
+    "archiver": "^7.0.1",
+    "axios": "^1.18.1",
+    "better-sqlite3": "^12.4.2",
+    "chart.js": "^4.5.1",
+    "chokidar": "^5.0.0",
+    "connect-history-api-fallback": "^2.0.0",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.19",
+    "dotenv": "^16.6.1",
+    "drizzle-orm": "^0.45.2",
+    "electron-updater": "^6.6.2",
+    "exifr": "^7.1.3",
+    "express": "^5.2.1",
+    "express-ws": "^5.0.2",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "filepond": "^4.32.10",
+    "filepond-plugin-file-encode": "^2.1.14",
+    "filepond-plugin-file-validate-type": "^1.2.9",
+    "fs-extra": "^11.3.5",
+    "gsap": "^3.14.1",
+    "jimp": "^1.6.1",
+    "lodash": "^4.17.21",
+    "mitt": "^3.0.1",
+    "node-llama-cpp": "^3.19.1",
+    "node-machine-id": "^1.1.12",
+    "node-stream-zip": "^1.15.0",
+    "onnxruntime-node": "1.14.0",
+    "path-browserify": "^1.0.1",
+    "pinia": "^4.0.3",
+    "rimraf": "^6.1.3",
+    "string-crypto": "^3.0.2",
+    "v-viewer": "^3.0.22",
+    "viewerjs": "^1.11.7",
+    "vue": "^3.5.0",
+    "vue-advanced-cropper": "^2.8.9",
+    "vue-chartjs": "^5.3.4",
+    "vue-country-flag-next": "^2.3.2",
+    "vue-filepond": "^7.0.4",
+    "vue-i18n": "^11.2.2",
+    "vue-router": "^4.3.0",
+    "vuedraggable": "^4.1.0",
+    "vuetify": "^3.11.6",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/lodash": "^4.17.24",
+    "@types/node": "^26.0.1",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-vue": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
+    "drizzle-kit": "^0.31.10",
+    "electron": "^42.5.0",
+    "electron-builder": "^26.0.12",
+    "eslint": "^10.6.0",
+    "eslint-plugin-vue": "^10.9.2",
+    "globals": "^17.7.0",
+    "jsdom": "^29.1.1",
+    "nodemon": "^3.1.14",
+    "rollup-plugin-visualizer": "^7.0.1",
+    "sass-embedded": "^1.95.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1",
+    "vite": "^8.1.0",
+    "vite-plugin-pwa": "^1.3.0",
+    "vite-plugin-vuetify": "^2.1.2",
+    "vitest": "^4.1.9",
+    "vue-tsc": "^3.3.5"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "build": {
+    "appId": "com.mediachips.app",
+    "productName": "MediaChips",
+    "copyright": "Copyright © 2026 MediaChips",
+    "beforePack": "./scripts/electron-before-pack.mjs",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      ".backend-build/**/*",
+      "!.backend-build/**/*.test.js",
+      "!.backend-build/**/*.tsbuildinfo",
+      "electron/**/*.js",
+      "!electron/**/*.test.js",
+      "main.js",
+      "dist/**/*",
+      "api/db/migrations-drizzle/**/*",
+      "!databases",
+      "!app_storage",
+      "!src",
+      "!.api-build",
+      "!.app-build",
+      "!.shared-build",
+      "!.electron-build",
+      "!.main-build",
+      "!.cache"
+    ],
+    "asarUnpack": [
+      "**/node_modules/ffmpeg-static/**",
+      "**/node_modules/ffprobe-static/**",
+      "**/node_modules/sharp/**",
+      "**/node_modules/@img/**",
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/@parcel/watcher/**",
+      "**/node_modules/@parcel/watcher-*/**",
+      "**/node_modules/node-llama-cpp/**",
+      "**/node_modules/@node-llama-cpp/**"
+    ],
+    "extraResources": [
+      {
+        "from": "models",
+        "to": "models",
+        "filter": [
+          "**/*",
+          "!**/clip-vit-base-patch32/**",
+          "!**/face-api/**"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "${productName}.v${version}.Windows.Installer.${ext}",
+      "verifyUpdateCodeSignature": false,
+      "icon": "public/icons/icon.png"
+    },
+    "appx": {
+      "applicationId": "mediaChips",
+      "identityName": "38214VitalyKrivoshei.mediaChips",
+      "publisherDisplayName": "Vitaly Krivoshei",
+      "displayName": "mediaChips",
+      "publisher": "CN=CD9954BD-179A-41DA-A241-063D0F1B3AA6",
+      "languages": [
+        "en-US",
+        "ru-RU",
+        "es-ES",
+        "zh-CN"
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}.v${version}.Windows.Portable.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "icon": "public/icons/icon.png",
+      "artifactName": "${productName}.v${version}.Linux.AppImage",
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    },
+    "dmg": {
+      "artifactName": "${productName}.v${version}.Mac.${arch}.${ext}",
+      "title": "Install ${productName}",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 180
+        },
+        {
+          "x": 400,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "mac": {
+      "icon": "public/icons/icons.icns",
+      "category": "public.app-category.utilities",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "artifactName": "${productName}.v${version}.Mac.${arch}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "fupdec",
+      "repo": "MediaChips"
+    }
+  }
+}

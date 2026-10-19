@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.api.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "tsBuildInfoFile": ".cache/tsc/api-strict.tsbuildinfo",
+    "resolveJsonModule": true,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    }
+  },
+  "include": ["api/**/*.ts", "shared/**/*.ts", "chip-recipes/recipes/**/*.json"]
+}

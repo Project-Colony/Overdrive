@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": ".cache/tsc/vue.tsbuildinfo",
+    "jsx": "preserve",
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,
+    "checkJs": false,
+    "esModuleInterop": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@shared/*": ["shared/*"],
+      "@mediachips/plugin-adult": ["packages/plugin-adult/src/index.ts"],
+      "@mediachips/plugin-adult/*": ["packages/plugin-adult/src/*"],
+      "@mediachips/plugin-tmdb": ["packages/plugin-tmdb/src/index.ts"],
+      "@mediachips/plugin-tmdb/*": ["packages/plugin-tmdb/src/*"]
+    },
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "src/**/*.js",
+    "shared/**/*.ts",
+    "packages/plugin-adult/src/**/*.ts",
+    "packages/plugin-adult/src/**/*.vue",
+    "packages/plugin-tmdb/src/**/*.ts",
+    "packages/plugin-tmdb/src/**/*.vue"
+  ],
+  "references": [{ "path": "./tsconfig.node.json" }],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "packages/**/*.test.ts",
+    "packages/**/*.spec.ts"
+  ]
+}
