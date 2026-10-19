@@ -13,6 +13,8 @@ relevant part before porting a feature, and port behaviour, not structure.
   better than it.
 - A fully new UI built on colony-ui: sidebar navigation, Colony themes,
   typography, settings page, en/fr i18n (see Resources `design/*.md`).
+- Windows, macOS (Apple Silicon and Intel) and Linux, first-class on all
+  three: every phase is done when it works on the three OS, not just Linux.
 - One raw binary per platform, listed in the Colony store through
   `colony.json`, released with Release Please and signed by the shared
   workflow.
@@ -62,9 +64,13 @@ the UI around it.
       glitches), try libmpv's render API into a texture.
 - [ ] Fallback in every case: "Open in external player" (mpv by default,
       configurable).
+- [ ] Run the spike on Windows, macOS and Linux. GStreamer is a system
+      package on Linux but must be shipped with the app on Windows and macOS,
+      which is the hard part; weigh that against libmpv (one shared library
+      per OS) before choosing.
 - [ ] Decide how ffmpeg and the player runtime ship under the single-binary
       rule (embed and extract on first run, as SAM Colony Edition's
-      `bootstrap.rs` does, or require a system package on Linux).
+      `bootstrap.rs` does, or require a system package on Linux only).
 
 Dev machine reference: Arch, Hyprland, NVIDIA; GStreamer 1.28.8 with base,
 good, bad and libav plugins (no ugly); mpv 0.41; ffmpeg 9.0.2.
