@@ -1436,6 +1436,7 @@ const es = {
     log_in: 'Iniciar sesión',
     password_required: 'Introduce tu contraseña',
     wrong_password: 'Contraseña incorrecta',
+    desktop_only: 'Overdrive se está ejecutando como aplicación de escritorio sin contraseña. Establece una contraseña en la aplicación de escritorio para usar la interfaz del navegador.',
   },
   bulk_editing: {
     title: 'Edición masiva',

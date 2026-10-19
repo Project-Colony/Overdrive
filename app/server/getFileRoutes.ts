@@ -5,7 +5,6 @@ import { apiErrorMessage } from '../../api/types/errors'
 import type { ResolveFilePathFn } from '../types/builtinRoutes'
 import path from 'path'
 import fs from 'fs'
-import { isAllowedOrigin } from './constants'
 import { isClientAbortError, safeJsonError } from './fileResolver'
 import { checkFilesExist } from '../../api/services/checkFilesExist'
 import { resolveVideoThumbFilePath } from '../../api/services/videoPreviewThumb'
@@ -48,15 +47,9 @@ function getFileRequestPath(req: ApiRequest): string | null {
   return null
 }
 
+// Requests with an Origin already passed (and got headers from) the global CORS middleware.
 function applyCorsHeaders(req: ApiRequest, res: ApiResponse) {
-  const requestOrigin = req.headers.origin
-  if (typeof requestOrigin === 'string' && isAllowedOrigin(requestOrigin)) {
-    res.setHeader('Access-Control-Allow-Origin', requestOrigin)
-    res.setHeader('Vary', 'Origin')
-    return
-  }
-
-  if (!requestOrigin) {
+  if (!req.headers.origin) {
     res.setHeader('Access-Control-Allow-Origin', '*')
   }
 }

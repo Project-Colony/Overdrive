@@ -1436,6 +1436,7 @@ const fr = {
     log_in: 'Connectez-vous',
     password_required: 'Entrez votre mot de passe',
     wrong_password: 'Mauvais mot de passe',
+    desktop_only: 'Overdrive fonctionne comme application de bureau sans mot de passe. Définissez un mot de passe dans l’application de bureau pour utiliser l’interface web.',
   },
   bulk_editing: {
     title: 'Modification en masse',

@@ -101,6 +101,11 @@ describe('serverProcess helpers', () => {
     expect(env.KEEP).toBe('1')
   })
 
+  it('passes the per-launch API secret only when given', () => {
+    expect(buildServerProcessEnv({dataDir: '/d', apiSecret: 'k', baseEnv: {}}).MEDIA_CHIPS_API_SECRET).toBe('k')
+    expect(buildServerProcessEnv({dataDir: '/d', baseEnv: {}})).not.toHaveProperty('MEDIA_CHIPS_API_SECRET')
+  })
+
   it('prefers portable dir for Electron data dir', () => {
     expect(resolveElectronDataDir({
       portableExecutableDir: '/portable',

@@ -7,6 +7,16 @@ import { AuthLoginRequestSchema } from '../../shared/schemas/requests'
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const SETTINGS_CACHE_MS = 10_000
+const LOGIN_FREE_FAILURES = 5
+const LOGIN_MAX_LOCK_MS = 15 * 60 * 1000
+/** Longer than any lock, so waiting out a reset is slower than the capped lockout itself. */
+const LOGIN_FAILURE_TTL_MS = 24 * 60 * 60 * 1000
+/** Per-launch key the Electron shell injects into every renderer request. */
+const API_SECRET_HEADER = 'x-overdrive-key'
+/** Only set when the Electron shell spawned this API. Dropped from the env so
+ * players, ffmpeg and file managers spawned later never inherit it. */
+const API_SECRET = process.env.MEDIA_CHIPS_API_SECRET || ''
+delete process.env.MEDIA_CHIPS_API_SECRET
 
 interface Session {
   createdAt: number
@@ -24,6 +34,9 @@ interface SettingRow {
 }
 
 type AuthService = ReturnType<typeof createAuthService>
+
+/** Settings rows that hold credentials (the password and integration API keys). */
+const SECRET_SETTING_OPTIONS = new Set(['phrase', 'tpdbApiKey', 'tmdbApiKey', 'jellyfinApiKey', 'stashApiKey'])
 
 function createAuthService(db: ApiDb) {
   const sessions = new Map<string, Session>()
@@ -82,7 +95,8 @@ function createAuthService(db: ApiDb) {
   async function verifyPassword(password: string): Promise<boolean> {
     const settings = await loadSecuritySettings()
     if (!settings.passwordProtection) return true
-    return password === settings.phrase
+    const digest = (value: string) => crypto.createHash('sha256').update(value).digest()
+    return crypto.timingSafeEqual(digest(password), digest(settings.phrase))
   }
 
   function extractToken(req: Request): string | null {
@@ -106,27 +120,14 @@ function createAuthService(db: ApiDb) {
     return validateToken(extractToken(req))
   }
 
-  function sanitizeSettingRows(
-    rows: SettingRow[],
-    passwordProtection: boolean,
-    authenticated: boolean,
-  ): SettingRow[] {
-    if (!passwordProtection || authenticated) return rows
-
-    return rows.map((row) =>
-      row.option === 'phrase' ? {...row, value: ''} : row,
-    )
+  /** `allowed`: isRequestAllowed(). /api/setting is public, so others get no credentials. */
+  function sanitizeSettingRow(row: SettingRow | null, allowed: boolean): SettingRow | null {
+    if (!row || allowed || !SECRET_SETTING_OPTIONS.has(row.option)) return row
+    return {...row, value: ''}
   }
 
-  function sanitizeSettingRow(
-    row: SettingRow | null,
-    passwordProtection: boolean,
-    authenticated: boolean,
-  ): SettingRow | null {
-    if (!row) return row
-    if (!passwordProtection || authenticated) return row
-    if (row.option === 'phrase') return {...row, value: ''}
-    return row
+  function sanitizeSettingRows(rows: SettingRow[], allowed: boolean): SettingRow[] {
+    return allowed ? rows : rows.map((row) => sanitizeSettingRow(row, false) as SettingRow)
   }
 
   setInterval(() => {
@@ -169,18 +170,40 @@ function isPublicApiPath(url: string): boolean {
   return PUBLIC_PATHS.has(path)
 }
 
+/** express-ws upgrades arrive as '/moving/.websocket' and '/watcher/.websocket'. */
+const WS_PATH = /^\/(watcher|moving)(\/|$)/
+
+function hasValidSecret(req: Request): boolean {
+  const provided = req.headers[API_SECRET_HEADER]
+  if (!API_SECRET || typeof provided !== 'string') return false
+  const a = Buffer.from(provided)
+  const b = Buffer.from(API_SECRET)
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+/**
+ * A login token always passes. Without a password, the Electron API also
+ * wants its per-launch secret; headless servers (no secret) stay open.
+ */
+async function isRequestAllowed(
+  authService: Pick<AuthService, 'isAuthRequired' | 'isRequestAuthenticated'>,
+  req: Request,
+): Promise<boolean> {
+  if (authService.isRequestAuthenticated(req)) return true
+  if (await authService.isAuthRequired()) return false
+  return !API_SECRET || hasValidSecret(req)
+}
+
 function createAuthMiddleware(authService: AuthService) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const url = req.url || ''
-    if (!url.startsWith('/api/')) return next()
+    // Express routing is case-insensitive, so the guard must be too.
+    const path = (req.path || '').toLowerCase()
+    if (!path.startsWith('/api/') && !WS_PATH.test(path)) return next()
     if (req.method === 'OPTIONS') return next()
-    if (isPublicApiPath(url)) return next()
+    if (isPublicApiPath(path)) return next()
 
     try {
-      const required = await authService.isAuthRequired()
-      if (!required) return next()
-
-      if (authService.isRequestAuthenticated(req)) return next()
+      if (await isRequestAllowed(authService, req)) return next()
 
       return res.status(401).json({message: 'Authentication required'})
     } catch (err) {
@@ -190,12 +213,17 @@ function createAuthMiddleware(authService: AuthService) {
 }
 
 function registerAuthRoutes(app: Express, authService: AuthService) {
+  // ponytail: in-memory and per-IP, so clients behind one IP (reverse proxy, Docker
+  // Desktop) share a lockout; key on the forwarded IP if that ever matters.
+  const loginFailures = new Map<string, {count: number; lockedUntil: number}>()
+
   app.get('/api/auth/status', async (req: Request, res: Response) => {
     try {
       const required = await authService.isAuthRequired()
       res.json({
         required,
         authenticated: authService.isRequestAuthenticated(req),
+        secretRequired: Boolean(API_SECRET) && !hasValidSecret(req),
       })
     } catch (_err: unknown) {
       res.status(500).json({message: 'Failed to read auth status'})
@@ -204,10 +232,22 @@ function registerAuthRoutes(app: Express, authService: AuthService) {
 
   app.post('/api/auth/login', validateBody(AuthLoginRequestSchema), async (req: Request, res: Response) => {
     try {
+      const ip = req.ip || req.socket.remoteAddress || ''
+      const previous = loginFailures.get(ip)
+      // Failures decay after a quiet day, so typos weeks apart never add up.
+      const failure = previous && Date.now() - previous.lockedUntil < LOGIN_FAILURE_TTL_MS ? previous : undefined
+      if (failure && Date.now() < failure.lockedUntil) {
+        res.setHeader('Retry-After', String(Math.ceil((failure.lockedUntil - Date.now()) / 1000)))
+        return res.status(429).json({message: 'Too many failed login attempts'})
+      }
+
       const required = await authService.isAuthRequired()
       const password = req.body?.password
 
       if (!required) {
+        if (API_SECRET && !hasValidSecret(req)) {
+          return res.status(401).json({message: 'Authentication required'})
+        }
         const token = authService.createSession()
         return res.json({token, required: false})
       }
@@ -218,9 +258,16 @@ function registerAuthRoutes(app: Express, authService: AuthService) {
 
       const valid = await authService.verifyPassword(password)
       if (!valid) {
+        // Exponential lockout after the free attempts: 1 s, 2 s, 4 s … capped at 15 min.
+        const count = (failure?.count || 0) + 1
+        const lockMs = count >= LOGIN_FREE_FAILURES
+          ? Math.min(2 ** (count - LOGIN_FREE_FAILURES) * 1000, LOGIN_MAX_LOCK_MS)
+          : 0
+        loginFailures.set(ip, {count, lockedUntil: Date.now() + lockMs})
         return res.status(401).json({message: 'Invalid password'})
       }
 
+      loginFailures.delete(ip)
       const token = authService.createSession()
       res.json({token, required: true})
     } catch (_err: unknown) {
@@ -235,4 +282,4 @@ function registerAuthRoutes(app: Express, authService: AuthService) {
   })
 }
 
-export { createAuthService, createAuthMiddleware, registerAuthRoutes }
+export { createAuthService, createAuthMiddleware, registerAuthRoutes, isRequestAllowed, hasValidSecret }

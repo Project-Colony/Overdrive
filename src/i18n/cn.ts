@@ -1436,6 +1436,7 @@ const cn = {
     log_in: '登录',
     password_required: '输入密码',
     wrong_password: '密码错误',
+    desktop_only: 'Overdrive 正以无密码的桌面应用运行。请在桌面应用中设置密码后再使用浏览器界面。',
   },
   bulk_editing: {
     title: '批量编辑',

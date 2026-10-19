@@ -7,6 +7,7 @@ import {
   installLiveTranscodeUnloadGuard,
   abortVideoPlayback,
 } from '@/utils/liveTranscodeLifecycle'
+import { setAuthToken } from '@/services/authSession'
 
 describe('liveTranscodeLifecycle', () => {
   beforeEach(() => {
@@ -85,5 +86,20 @@ describe('liveTranscodeLifecycle', () => {
     expect(getMarkedLiveTranscodeMediaId()).toBeNull()
 
     removeGuard()
+  })
+
+  it('passes the session token, since the stop routes sit behind auth', async () => {
+    setAuthToken('tok')
+    markLiveTranscodeSession(5)
+
+    await cleanupOrphanedLiveTranscode({
+      buildStopUrl: (mediaId) => `/api/video/${mediaId}/transcode/stream`,
+      stopAllUrl: '/api/transcode/streams',
+    })
+
+    expect(fetch).toHaveBeenCalledWith('/api/video/5/transcode/stream?token=tok', {
+      method: 'DELETE',
+      keepalive: false,
+    })
   })
 })

@@ -2,19 +2,27 @@
  * @vitest-environment node
  */
 import {beforeEach, describe, expect, it, vi} from 'vitest'
+import type {ServerConfig} from '../types/server'
 
-const {saveConfigFile, restartListener} = vi.hoisted(() => ({
+const {saveConfigFile, restartListener, security} = vi.hoisted(() => ({
   saveConfigFile: vi.fn(),
   restartListener: vi.fn().mockResolvedValue(undefined),
+  security: {passwordProtection: false, phrase: ''},
 }))
 
 vi.mock('./configFile', () => ({
   saveConfigFile,
 }))
 
+vi.mock('./authRegistry', () => ({
+  getAuthService: () => ({loadSecuritySettings: async () => security}),
+}))
+
 import {
   applyLanAccessChange,
   didLanAccessChange,
+  initLanAccess,
+  isLanAccessEnabled,
   registerServerNetworkDeps,
 } from './lanAccess'
 
@@ -54,5 +62,28 @@ describe('applyLanAccessChange', () => {
     await applyLanAccessChange(false)
     expect(restartListener).not.toHaveBeenCalled()
     expect(saveConfigFile).toHaveBeenCalled()
+  })
+
+  it('refuses to enable LAN without a password', async () => {
+    Object.assign(security, {passwordProtection: false, phrase: ''})
+    await expect(applyLanAccessChange(true)).rejects.toThrow('Set a password before enabling LAN access')
+    Object.assign(security, {passwordProtection: true, phrase: ''})
+    await expect(applyLanAccessChange(true)).rejects.toThrow('Set a password')
+    expect(isLanAccessEnabled()).toBe(false)
+    expect(restartListener).not.toHaveBeenCalled()
+  })
+
+  it('keeps LAN off at startup when no password is set', async () => {
+    Object.assign(security, {passwordProtection: false, phrase: ''})
+    const config: ServerConfig = {port: 0, databases: [], allowLanAccess: '1'}
+    await expect(initLanAccess({} as never, {} as never, config)).resolves.toBe(false)
+    expect(config.allowLanAccess).toBe('0')
+  })
+
+  it('enables LAN once a password is set', async () => {
+    Object.assign(security, {passwordProtection: true, phrase: 'hunter2'})
+    await applyLanAccessChange(true)
+    expect(isLanAccessEnabled()).toBe(true)
+    expect(restartListener).toHaveBeenCalledTimes(1)
   })
 })

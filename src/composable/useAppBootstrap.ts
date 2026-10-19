@@ -6,7 +6,7 @@ import {useI18n} from 'vue-i18n'
 import {loadLocale} from '@/i18n/loadLocale'
 import {typedApi} from '@/services/typedApi'
 import {getAuthToken, clearAuthToken} from '@/services/authSession'
-import {updateConfig} from '@/services/configService'
+import {refreshServerConfig, updateConfig} from '@/services/configService'
 import {getWatchedFolders} from '@/services/watcherService'
 import {getActiveWatchedFolders, type WatchedFolderEntry} from '@/services/watcherUtils'
 import {useWatcher} from '@/composable/Watcher'
@@ -255,7 +255,10 @@ export function useAppBootstrap({isPlayerWindow, appZoom}: UseAppBootstrapOption
   async function tryRestoreSession(): Promise<boolean> {
     if (settingsStore.passwordProtection !== '1') {
       store.isLocked = false
-      return true
+      // Without a password the desktop app's API only answers its own windows.
+      const status = await typedApi.getAuthStatus().catch(() => null)
+      store.isDesktopOnly = status?.data.secretRequired === true
+      return !store.isDesktopOnly
     }
 
     if (!getAuthToken()) {
@@ -512,10 +515,16 @@ export function useAppBootstrap({isPlayerWindow, appZoom}: UseAppBootstrapOption
   }
 
   const handleAuthenticated: Handler = () => {
-    void loadMainAppData().then(() => {
-      startWatcherIfEnabled()
-      return markAppReady()
-    })
+    // Before login /api/config and /api/setting hide API keys and the password: reload
+    // both, or a settings field left blank would overwrite the stored value on blur.
+    void refreshServerConfig()
+      .catch((error: unknown) => console.warn('Failed to refresh config after login:', error))
+      .then(() => initSettings())
+      .then(() => loadMainAppData())
+      .then(() => {
+        startWatcherIfEnabled()
+        return markAppReady()
+      })
   }
 
   let unregisterMetaCatalogLoader: (() => void) | null = null

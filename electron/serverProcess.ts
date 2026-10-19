@@ -40,6 +40,8 @@ export function resolveServerProcessCwd(appRoot: string): string {
 export function buildServerProcessEnv(options: {
   dataDir: string
   resourcesPath?: string
+  /** Per-launch key the API requires from the renderer (X-Overdrive-Key). */
+  apiSecret?: string
   baseEnv?: NodeJS.ProcessEnv
 }): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
@@ -50,6 +52,9 @@ export function buildServerProcessEnv(options: {
   const resourcesPath = options.resourcesPath?.trim()
   if (resourcesPath) {
     env.MEDIA_CHIPS_RESOURCES_PATH = resourcesPath
+  }
+  if (options.apiSecret) {
+    env.MEDIA_CHIPS_API_SECRET = options.apiSecret
   }
   return env
 }
@@ -81,6 +86,7 @@ export function startServerProcess(options: {
   appRoot: string
   dataDir: string
   resourcesPath?: string
+  apiSecret?: string
   execPath?: string
   spawnImpl?: typeof spawn
   handles?: ServerProcessHandles
@@ -92,6 +98,7 @@ export function startServerProcess(options: {
   const env = buildServerProcessEnv({
     dataDir: options.dataDir,
     resourcesPath: options.resourcesPath,
+    apiSecret: options.apiSecret,
   })
 
   const child = spawnImpl(execPath, [scriptPath], {
@@ -189,6 +196,7 @@ export function createServerProcessSupervisor(options: {
   appRoot: string
   dataDir: string
   resourcesPath?: string
+  apiSecret?: string
   execPath?: string
   spawnImpl?: typeof spawn
   stopPlatform?: NodeJS.Platform
@@ -255,6 +263,7 @@ export function createServerProcessSupervisor(options: {
       appRoot: options.appRoot,
       dataDir: options.dataDir,
       resourcesPath: options.resourcesPath,
+      apiSecret: options.apiSecret,
       execPath: options.execPath,
       spawnImpl: options.spawnImpl,
       handles,

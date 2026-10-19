@@ -60,6 +60,8 @@ export interface AppLogEntry {
 export interface AppState {
   is_app_ready: boolean
   isServerError?: boolean
+  /** A browser reached the desktop app's API while it has no password (see auth.ts). */
+  isDesktopOnly?: boolean
   localhost: string
   appVersion: string
   app_title: string

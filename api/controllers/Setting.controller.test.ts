@@ -9,7 +9,9 @@ const {
   sanitizeSettingRows,
   sanitizeSettingRow,
   isRequestAuthenticated,
+  isAuthRequired,
   invalidateSettingsCache,
+  isLanAccessEnabled,
   isLanAccessEnvLocked,
   applyLanAccessChange,
 } = vi.hoisted(() => ({
@@ -20,7 +22,9 @@ const {
   sanitizeSettingRows: vi.fn(),
   sanitizeSettingRow: vi.fn(),
   isRequestAuthenticated: vi.fn(),
+  isAuthRequired: vi.fn(),
   invalidateSettingsCache: vi.fn(),
+  isLanAccessEnabled: vi.fn(),
   isLanAccessEnvLocked: vi.fn(),
   applyLanAccessChange: vi.fn(),
 }))
@@ -39,16 +43,19 @@ vi.mock('../../app/server/authRegistry', () => ({
     sanitizeSettingRows,
     sanitizeSettingRow,
     isRequestAuthenticated,
+    isAuthRequired,
     invalidateSettingsCache,
   }),
 }))
 
 vi.mock('../../app/server/lanAccess', () => ({
+  isLanAccessEnabled,
   isLanAccessEnvLocked,
   applyLanAccessChange,
 }))
 
 import createSettingController from './Setting.controller'
+import { createAuthService } from '../../app/server/auth'
 
 function createResponse() {
   const res = {
@@ -59,6 +66,10 @@ function createResponse() {
       return res
     },
     send(payload: unknown) {
+      res.body = payload
+      return res
+    },
+    json(payload: unknown) {
       res.body = payload
       return res
     },
@@ -78,6 +89,8 @@ describe('Setting.controller', () => {
     vi.clearAllMocks()
     loadSecuritySettings.mockResolvedValue({passwordProtection: false})
     isRequestAuthenticated.mockReturnValue(true)
+    isAuthRequired.mockResolvedValue(false)
+    isLanAccessEnabled.mockReturnValue(false)
     isLanAccessEnvLocked.mockReturnValue(false)
     applyLanAccessChange.mockResolvedValue(undefined)
   })
@@ -94,6 +107,28 @@ describe('Setting.controller', () => {
     expect(sanitizeSettingRows).toHaveBeenCalled()
     expect(res.statusCode).toBe(200)
     expect(res.body).toEqual([{option: 'theme', value: 'dark'}])
+  })
+
+  it('hides credentials from callers that may not use the API', async () => {
+    sanitizeSettingRows.mockImplementation(createAuthService({drizzle: {}} as never).sanitizeSettingRows)
+    isAuthRequired.mockResolvedValue(true)
+    isRequestAuthenticated.mockReturnValue(false)
+    findAll.mockReturnValue([
+      {option: 'phrase', value: 'hunter2'},
+      {option: 'tmdbApiKey', value: 'tmdb-key'},
+      {option: 'tpdbApiKey', value: 'tpdb-key'},
+      {option: 'theme', value: 'dark'},
+    ])
+
+    const res = createResponse()
+    await controller.findAll({} as ApiRequest, res)
+
+    expect(res.body).toEqual([
+      {option: 'phrase', value: ''},
+      {option: 'tmdbApiKey', value: ''},
+      {option: 'tpdbApiKey', value: ''},
+      {option: 'theme', value: 'dark'},
+    ])
   })
 
   it('returns a sanitized single setting', async () => {
@@ -123,6 +158,22 @@ describe('Setting.controller', () => {
     expect(invalidateSettingsCache).toHaveBeenCalled()
     expect(res.statusCode).toBe(200)
     expect(res.body).toEqual([1])
+  })
+
+  it('refuses to remove the password while LAN access is on', async () => {
+    isLanAccessEnabled.mockReturnValue(true)
+
+    for (const [option, value] of [['passwordProtection', '0'], ['phrase', '']]) {
+      const res = createResponse()
+      await controller.update({params: {option}, body: {value}} as unknown as ApiRequest, res)
+      expect(res.statusCode).toBe(409)
+      expect(res.body).toEqual({message: 'Disable LAN access before removing the password'})
+    }
+    expect(upsertByOption).not.toHaveBeenCalled()
+
+    const res = createResponse()
+    await controller.update({params: {option: 'phrase'}, body: {value: 'new-secret'}} as unknown as ApiRequest, res)
+    expect(upsertByOption).toHaveBeenCalledWith('phrase', 'new-secret')
   })
 
   it('blocks LAN access updates when controlled by environment', async () => {

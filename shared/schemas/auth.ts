@@ -3,6 +3,8 @@ import { z } from 'zod'
 export const AuthStatusSchema = z.object({
   required: z.boolean(),
   authenticated: z.boolean(),
+  /** Desktop API with no password: only the app's own windows (X-Overdrive-Key) get in. */
+  secretRequired: z.boolean().optional(),
 })
 
 export const AuthLoginSchema = z.object({

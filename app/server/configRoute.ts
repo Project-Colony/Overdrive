@@ -11,6 +11,8 @@ import {
 import { isLanAccessEnabled, isLanAccessEnvLocked } from './lanAccess'
 import { getAllIps, getBestLocalIp } from './network'
 import { pickPublicHost } from './publicHost'
+import { hasValidSecret, isRequestAllowed } from './auth'
+import { getAuthService } from './authRegistry'
 
 function buildGlobalSettingsPayload(config: ServerConfig) {
   const source = config as unknown as Record<string, unknown>
@@ -29,7 +31,7 @@ export function registerConfigRoute(
   config: ServerConfig,
   databasesPath: string,
 ) {
-  app.get('/api/config', (req: ApiRequest, res: ApiResponse) => {
+  app.get('/api/config', async (req: ApiRequest, res: ApiResponse) => {
     console.log('Config request from:', req.headers.origin || 'unknown origin')
 
     const activeDb = config.databases.find((dbEntry: ServerDatabaseEntry) => dbEntry.active)
@@ -37,6 +39,13 @@ export function registerConfigRoute(
       {getBestLocalIp, getAllIps},
       {requestHostname: req.hostname},
     )
+
+    const globalSettings = buildGlobalSettingsPayload(config)
+    // Public boot payload: only callers that may use the API (or the Electron
+    // shell, which caches this for its renderer) get the TPDB key.
+    if (!hasValidSecret(req) && !await isRequestAllowed(getAuthService(), req)) {
+      delete globalSettings.tpdbApiKey
+    }
 
     res.json({
       ip: frontendIp,
@@ -57,7 +66,7 @@ export function registerConfigRoute(
       allowLanAccessEnvLocked: isLanAccessEnvLocked(),
       registration: typeof config.registration === 'string' ? config.registration : '',
       minimizeToTray: readMinimizeToTrayConfig(config as unknown as Record<string, unknown>),
-      ...buildGlobalSettingsPayload(config),
+      ...globalSettings,
       ...(typeof config.onboardingCompleted === 'string' ? { onboardingCompleted: config.onboardingCompleted } : {}),
       ...(typeof config.onboardingStep === 'string' ? { onboardingStep: config.onboardingStep } : {}),
       ...(typeof config.onboardingPaused === 'string' ? { onboardingPaused: config.onboardingPaused } : {}),

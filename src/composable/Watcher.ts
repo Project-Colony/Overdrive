@@ -20,6 +20,7 @@ import {
 } from '@/utils/watcherScanNotifications'
 import {useMediaInboxStore} from '@/stores/mediaInbox'
 import uniqBy from 'lodash/uniqBy'
+import {getAuthToken} from '@/services/authSession'
 
 export function useWatcher(apiUrl: string) {
   const settingsStore = useSettingsStore()
@@ -58,8 +59,10 @@ export function useWatcher(apiUrl: string) {
     }
 
     try {
+      // Browsers cannot set headers on WebSockets; the API reads ?token= instead.
+      const token = getAuthToken()
       watcherStore.ws = new WebSocket(
-        apiUrl.replace('http', 'ws') + '/watcher'
+        apiUrl.replace('http', 'ws') + '/watcher' + (token ? `?token=${encodeURIComponent(token)}` : '')
       )
 
       watcherStore.ws.onopen = () => {

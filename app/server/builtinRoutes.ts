@@ -10,9 +10,10 @@ import type { ServerDatabaseEntry } from '../types/server'
 import path from 'path'
 import fs from 'fs'
 import { createMediaRepository } from '../../api/db/repositories/media'
-import { normalizeMediaPath } from '../../api/utils/normalizeUserPath'
 import {
+  isLanAccessEnabled,
   isLanAccessEnvLocked,
+  isPasswordSet,
   applyLanAccessChange,
   didLanAccessChange,
 } from './lanAccess'
@@ -30,6 +31,28 @@ import { getDatabaseManager } from './databaseRegistry'
 import { createStorageDirectories } from './serverConfig'
 import packageJson from '../../package.json'
 import { parseBooleanSetting } from '../../shared/parseBooleanSetting'
+import { GLOBAL_APP_CONFIG_KEYS, MINIMIZE_TO_TRAY_CONFIG_KEY } from '../../shared/appGlobalConfig'
+import { UPDATE_PREFERENCES_KEYS } from '../../shared/updatePreferences'
+
+/**
+ * Keys the UI posts to /api/update-config. Everything else (port, path, ips…)
+ * stays server-owned; allowLanAccess goes through applyLanAccessChange only.
+ */
+const UPDATABLE_CONFIG_KEYS: ReadonlySet<string> = new Set([
+  ...GLOBAL_APP_CONFIG_KEYS.filter((key) => key !== 'allowLanAccess'),
+  ...UPDATE_PREFERENCES_KEYS,
+  MINIMIZE_TO_TRAY_CONFIG_KEY,
+  'databases',
+  'win',
+  'player',
+  'registration',
+  'onboardingCompleted',
+  'onboardingStep',
+  'onboardingPaused',
+  'seenFeatureHints',
+  'freeLibraryCapSettled',
+  'freeLibraryGrandfathered',
+])
 
 function resolveMediaVideoPath(
   db: ApiDb,
@@ -309,9 +332,20 @@ function registerBuiltinRoutes({
     const lanAccessInPayload = Boolean(req.body && 'allowLanAccess' in req.body)
       && !isLanAccessEnvLocked()
 
-    Object.assign(config, req.body)
+    // Each id becomes a folder name under databasesPath: no separators, no '..'.
+    const databasesOk = Array.isArray(req.body?.databases)
+      && req.body.databases.every((entry: unknown) => {
+        const id = (entry as {id?: unknown} | null)?.id
+        return typeof id === 'string' && !['', '.', '..'].includes(id) && path.basename(id) === id
+      })
 
-    if (Array.isArray(req.body?.databases)) {
+    for (const [key, value] of Object.entries(req.body || {})) {
+      if (!UPDATABLE_CONFIG_KEYS.has(key)) continue
+      if (key === 'databases' && !databasesOk) continue
+      ;(config as unknown as Record<string, unknown>)[key] = value
+    }
+
+    if (databasesOk) {
       createStorageDirectories(config, databasesPath)
     }
 
@@ -328,8 +362,9 @@ function registerBuiltinRoutes({
         && didLanAccessChange(previousAllowLanAccess, req.body.allowLanAccess)
       ) {
         const enabled = parseBooleanSetting(req.body.allowLanAccess, true)
-        config.allowLanAccess = enabled ? '1' : '0'
+        // Set only once accepted: a refused enable (no password) must not be persisted later.
         await applyLanAccessChange(enabled)
+        config.allowLanAccess = enabled ? '1' : '0'
       } else {
         if (lanAccessInPayload) {
           config.allowLanAccess = parseBooleanSetting(req.body.allowLanAccess, true) ? '1' : '0'
@@ -357,6 +392,10 @@ function registerBuiltinRoutes({
 
     try {
       const database = await getDatabaseManager().switchToDatabase(String(databaseId))
+      // The password lives in each database: never keep LAN open on one without it.
+      if (isLanAccessEnabled() && !isLanAccessEnvLocked() && !await isPasswordSet()) {
+        await applyLanAccessChange(false)
+      }
 
       res.json({
         success: true,
@@ -380,38 +419,7 @@ function registerBuiltinRoutes({
       return res.json({error: 'No file path provided'})
     }
 
-    const resolvedPath = resolveFilePath(filePath)
-    const normalizedPath = normalizeMediaPath(filePath)
-
-    const results = []
-    for (const dbEntry of config.databases) {
-      const cleanPath = normalizedPath
-        .replace(/^\/+/, '')
-        .replace(/^.*(?:databases|app_storage)[\\/]+[a-f0-9]{12}[\\/]+/i, '')
-
-      const possiblePaths = [
-        path.join(databasesPath, dbEntry.id, 'media', cleanPath),
-        path.join(databasesPath, dbEntry.id, cleanPath),
-        path.join(databasesPath, dbEntry.id, 'meta', cleanPath),
-      ]
-
-      for (const possiblePath of possiblePaths) {
-        const exists = fs.existsSync(possiblePath)
-        if (exists) {
-          results.push({
-            databaseId: dbEntry.id,
-            databaseName: dbEntry.name,
-            active: dbEntry.active,
-            exists: true,
-          })
-        }
-      }
-    }
-
-    res.json({
-      exists: !!resolvedPath,
-      results,
-    })
+    res.json({exists: !!resolveFilePath(filePath)})
   })
 
   router.get('/api/video/:id/playable', async (req: ApiRequest, res: ApiResponse) => {

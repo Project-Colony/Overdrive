@@ -1436,6 +1436,7 @@ const pt = {
     log_in: 'Faça login',
     password_required: 'Digite sua senha',
     wrong_password: 'Senha errada',
+    desktop_only: 'O Overdrive está sendo executado como aplicativo de desktop sem senha. Defina uma senha no aplicativo de desktop para usar a interface do navegador.',
   },
   bulk_editing: {
     title: 'Edição em massa',

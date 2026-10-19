@@ -15,6 +15,17 @@
       </v-alert>
     </v-dialog>
 
+    <v-dialog
+      :model-value="appStore.isDesktopOnly"
+      persistent
+      opacity="1"
+      width="700"
+    >
+      <v-alert type="warning" variant="flat" class="mb-0" rounded="lg">
+        {{ t('login.desktop_only') }}
+      </v-alert>
+    </v-dialog>
+
     <DialogLogin
       :model-value="appStore.isLocked"
       @close="closeApp"

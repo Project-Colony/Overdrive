@@ -7,6 +7,7 @@ import { useAppStore } from '@/stores/app'
 import { getReadableDuration, getReadableFileSize } from '@/services/formatUtils'
 import type { MoveErrorMessage, MoveWsMessage } from '@/types/stores'
 import type { Locale } from '@/utils/translate'
+import { getAuthToken } from '@/services/authSession'
 
 interface MovingRunOptions {
   onMessage?: (msg: MoveWsMessage) => void
@@ -220,7 +221,9 @@ export const useOperationsStore = defineStore('useOperationsStore', {
           resolve(result)
         }
 
+        const token = getAuthToken()
         const wsUrl = (app.localhost || '').replace('http', 'ws') + '/moving'
+          + (token ? `?token=${encodeURIComponent(token)}` : '')
         const ws = new WebSocket(wsUrl)
         const updateTask = (data: Record<string, unknown>) => tasks.updateTask(taskId, data)
 

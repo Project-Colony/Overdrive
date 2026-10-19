@@ -18,7 +18,7 @@ function createExpressApp() {
   app.use(express.urlencoded({extended: true}))
 
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.url.startsWith('/api/')) {
+    if (req.url.toLowerCase().startsWith('/api/')) {
       const normalized = normalizeApiPath(req.url)
       if (normalized !== req.url) {
         req.url = normalized
@@ -46,8 +46,7 @@ function createExpressApp() {
     next()
   })
 
-  app.use(router)
-
+  // The caller mounts `router` after its auth middleware.
   return {app, router}
 }
 

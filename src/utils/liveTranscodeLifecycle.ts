@@ -1,4 +1,12 @@
+import {getAuthToken} from '@/services/authSession'
+
 const LIVE_TRANSCODE_SESSION_KEY = 'mcLiveTranscodeMediaId'
+
+/** Plain (keepalive) fetch skips the axios auth header: send the token like <video> URLs do. */
+function withAuthToken(url: string): string {
+  const token = getAuthToken()
+  return token ? `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : url
+}
 
 export function markLiveTranscodeSession(mediaId: number | string | null | undefined): void {
   if (mediaId == null || mediaId === '') return
@@ -55,7 +63,7 @@ export function stopLiveTranscodeRequest(
 ): Promise<void> {
   if (!stopUrl) return Promise.resolve()
 
-  return fetch(stopUrl, {
+  return fetch(withAuthToken(stopUrl), {
     method: 'DELETE',
     keepalive,
   }).catch(() => {}) as Promise<void>
@@ -67,7 +75,7 @@ export function stopAllLiveTranscodeStreams(
 ): Promise<void> {
   if (!stopAllUrl) return Promise.resolve()
 
-  return fetch(stopAllUrl, {
+  return fetch(withAuthToken(stopAllUrl), {
     method: 'DELETE',
     keepalive,
   }).catch(() => {}) as Promise<void>

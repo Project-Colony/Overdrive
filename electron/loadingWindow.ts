@@ -82,12 +82,6 @@ export function createLoadingWindowController(deps: {
       alwaysOnTop: false,
       backgroundColor: '#f3f1f8',
       icon: resolveWindowIconPath(deps.getAppRoot()),
-      webPreferences: {
-        nodeIntegration: true,
-        nodeIntegrationInWorker: true,
-        webSecurity: false,
-        contextIsolation: false,
-      },
     })
 
     loading.center()

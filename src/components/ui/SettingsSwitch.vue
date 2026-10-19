@@ -2,6 +2,8 @@
 import {useAttrs} from 'vue'
 import {useSettingsStore} from "@/stores/settings";
 import {setOption as persistSetting} from '@/services/settingsService'
+import {useNotificationsStore} from '@/stores/notifications'
+import {getApiErrorMessage} from '@/types/vue'
 import type {SettingsState} from '@/types/settings'
 
 const emit = defineEmits<{
@@ -23,9 +25,18 @@ const props = withDefaults(defineProps<{
   disabled: false,
 })
 
-const setOption = (value: SettingsState[keyof SettingsState]) => {
-  persistSetting(value, props.option)
+const setOption = async (value: SettingsState[keyof SettingsState]) => {
+  const previous = settingsStore[props.option]
+  const saved = persistSetting(value, props.option)
   emit('update', value)
+  try {
+    await saved
+  } catch (error) {
+    // Refused by the server (e.g. LAN access without a password): show the real state.
+    settingsStore[props.option] = previous
+    emit('update', previous)
+    useNotificationsStore().setNotification({type: 'error', text: getApiErrorMessage(error)})
+  }
 }
 </script>
 

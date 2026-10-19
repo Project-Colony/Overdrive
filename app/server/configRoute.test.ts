@@ -1,4 +1,4 @@
-import {afterEach, describe, expect, it} from 'vitest'
+import {afterEach, describe, expect, it, vi} from 'vitest'
 import {createServer} from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
@@ -7,12 +7,22 @@ import {registerConfigRoute} from './configRoute'
 import {createAuthMiddleware} from './auth'
 import type {ServerConfig} from '../types/server'
 
+const auth = vi.hoisted(() => ({required: false}))
+
+vi.mock('./authRegistry', () => ({
+  getAuthService: () => ({
+    isAuthRequired: async () => auth.required,
+    isRequestAuthenticated: () => false,
+  }),
+}))
+
 type TestServer = {
   baseUrl: string
   close: () => Promise<void>
 }
 
 async function startServer(authRequired = false): Promise<TestServer> {
+  auth.required = authRequired
   const {app} = createExpressApp()
   if (authRequired) {
     const authService = {
@@ -27,6 +37,7 @@ async function startServer(authRequired = false): Promise<TestServer> {
     databases: [{id: 'db1', name: 'Main', active: true}],
     ips: ['192.168.0.177'],
     hostname: 'mediachips-pc',
+    tpdbApiKey: 'tpdb-secret',
   } satisfies ServerConfig, path.join(os.tmpdir(), 'mediachips-config-route'))
 
   const server = createServer(app)
@@ -54,16 +65,18 @@ describe('GET /api/config', () => {
     server = await startServer(false)
     const response = await fetch(server.baseUrl + '/api/config')
     expect(response.ok).toBe(true)
-    const body = await response.json() as {port: number; databases: unknown[]}
+    const body = await response.json() as {port: number; databases: unknown[]; tpdbApiKey?: string}
     expect(body.port).toBe(12321)
     expect(body.databases).toHaveLength(1)
+    expect(body.tpdbApiKey).toBe('tpdb-secret')
   })
 
   it('stays available when password protection is on', async () => {
     server = await startServer(true)
     const response = await fetch(server.baseUrl + '/api/config')
     expect(response.status).toBe(200)
-    const body = await response.json() as {port: number}
+    const body = await response.json() as {port: number; tpdbApiKey?: string}
     expect(body.port).toBe(12321)
+    expect(body).not.toHaveProperty('tpdbApiKey')
   })
 })

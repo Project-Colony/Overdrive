@@ -4,7 +4,8 @@ import type { ApiRequest, ApiResponse } from '../types/http'
 
 import { createSettingsRepository } from '../db/repositories/settings'
 import { getAuthService } from '../../app/server/authRegistry'
-import { applyLanAccessChange, isLanAccessEnvLocked } from '../../app/server/lanAccess'
+import { isRequestAllowed } from '../../app/server/auth'
+import { applyLanAccessChange, isLanAccessEnabled, isLanAccessEnvLocked } from '../../app/server/lanAccess'
 import { isGlobalAppConfigKey } from '../../shared/appGlobalConfig'
 import { getAppConfigPath } from '../utils/appConfigPath'
 import { loadConfigFile, saveConfigFile } from '../../app/server/configFile'
@@ -16,11 +17,9 @@ export default function (db: ApiDb) {
     try {
       const authService = getAuthService()
       const data = settingsRepo.findAll()
-      const settings = await authService.loadSecuritySettings()
       const sanitized = authService.sanitizeSettingRows(
         data as Parameters<typeof authService.sanitizeSettingRows>[0],
-        settings.passwordProtection,
-        authService.isRequestAuthenticated(req),
+        await isRequestAllowed(authService, req),
       )
       sendOk(res, sanitized)
     } catch (err: unknown) {
@@ -32,11 +31,9 @@ export default function (db: ApiDb) {
     try {
       const authService = getAuthService()
       const data = settingsRepo.findByOption(paramString(req.params.option))
-      const settings = await authService.loadSecuritySettings()
       const sanitized = authService.sanitizeSettingRow(
         (data ?? null) as Parameters<typeof authService.sanitizeSettingRow>[0],
-        settings.passwordProtection,
-        authService.isRequestAuthenticated(req),
+        await isRequestAllowed(authService, req),
       )
       sendOk(res, sanitized)
     } catch (err: unknown) {
@@ -81,6 +78,13 @@ export default function (db: ApiDb) {
 
         settingsRepo.upsertByOption(option, '')
         return sendOk(res, [1])
+      }
+
+      const removesPassword = (option === 'passwordProtection' && String(req.body.value) !== '1')
+        || (option === 'phrase' && String(req.body.value ?? '') === '')
+      // LAN mode needs a password (lanAccess.ts); the env-locked Docker mode is the operator's call.
+      if (removesPassword && isLanAccessEnabled() && !isLanAccessEnvLocked()) {
+        throw new HttpError(409, 'Disable LAN access before removing the password')
       }
 
       settingsRepo.upsertByOption(option, req.body.value)

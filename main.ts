@@ -1,5 +1,6 @@
 import type { BrowserWindow as BrowserWindowInstance } from 'electron'
-import { app, powerMonitor } from 'electron'
+import { app, powerMonitor, session, shell } from 'electron'
+import crypto from 'crypto'
 import os from 'os'
 import path from 'path'
 
@@ -19,7 +20,7 @@ import {
 import { createLoadingWindowController } from './electron/loadingWindow'
 import { createMainWindowController } from './electron/mainWindow'
 import { createPlayerWindowController } from './electron/playerWindow'
-import { registerShellIpc } from './electron/shellIpc'
+import { parseExternalUrl, registerShellIpc } from './electron/shellIpc'
 import { registerBridgeIpc } from './electron/bridgeIpc'
 import { registerWindowChromeIpc } from './electron/windowChromeIpc'
 import {
@@ -122,10 +123,15 @@ function syncPortFromConfigFile(): number {
   return resolveListenPort(shellConfig.port)
 }
 
+/** Per-launch key: the API child requires it (X-Overdrive-Key) from this app only. */
+const apiSecret = crypto.randomBytes(32).toString('hex')
+
 async function refreshApiConfigCache(): Promise<void> {
   const port = syncPortFromConfigFile()
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/config`)
+    const response = await fetch(`http://127.0.0.1:${port}/api/config`, {
+      headers: {'X-Overdrive-Key': apiSecret},
+    })
     if (!response.ok) return
     apiConfigCache = await response.json() as Record<string, unknown>
   } catch (error) {
@@ -150,6 +156,7 @@ const apiSupervisor = createServerProcessSupervisor({
   appRoot,
   dataDir,
   resourcesPath: process.resourcesPath,
+  apiSecret,
 })
 
 try {
@@ -367,6 +374,41 @@ registerBridgeIpc({ getMainWindow: () => mainWindow.getWindow() })
 
 powerMonitor.on('resume', () => {
   void ensureBackendAfterResume()
+})
+
+// Every window (main, player) shares the default session: inject the key into
+// their API requests, including <img>/<video> Range loads and WS upgrades.
+void app.whenReady().then(() => {
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    {urls: ['http://127.0.0.1:*/*', 'http://localhost:*/*', 'ws://127.0.0.1:*/*', 'ws://localhost:*/*']},
+    (details, callback) => {
+      let isSubframe = true
+      try {
+        // Top frames can only be the app (will-navigate guard below); subframes such as
+        // the sandboxed HTML preview must not send the key. No frame: keep the key.
+        isSubframe = Boolean(details.frame?.parent)
+      } catch {
+        // WebFrameMain throws once its frame is disposed: treat it as untrusted.
+      }
+      // Patterns match any port; other local services must never see the key.
+      if (!isSubframe && (new URL(details.url).port || '80') === String(shellConfig.port)) {
+        details.requestHeaders['X-Overdrive-Key'] = apiSecret
+      }
+      callback({requestHeaders: details.requestHeaders})
+    },
+  )
+})
+
+// The session is privileged now: no child windows, no navigation off the app origin.
+app.on('web-contents-created', (_event, contents) => {
+  contents.setWindowOpenHandler(({url}) => {
+    const parsed = parseExternalUrl(url)
+    if (parsed.ok) shell.openExternal(parsed.url).catch(() => {})
+    return {action: 'deny'}
+  })
+  contents.on('will-navigate', (event) => {
+    if (new URL(event.url).origin !== new URL(getRendererUrl()).origin) event.preventDefault()
+  })
 })
 
 appLifecycle.register()

@@ -1516,6 +1516,7 @@ const en = {
     log_in: 'Log in',
     password_required: 'Enter your password',
     wrong_password: 'Wrong password',
+    desktop_only: 'Overdrive is running as a desktop app without a password. Set a password in the desktop app to use the browser UI.',
   },
   bulk_editing: {
     title: 'Bulk Editing',

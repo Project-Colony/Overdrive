@@ -1436,6 +1436,7 @@ const de = {
     log_in: 'Anmelden',
     password_required: 'Passwort eingeben',
     wrong_password: 'Falsches Passwort',
+    desktop_only: 'Overdrive läuft als Desktop-App ohne Passwort. Legen Sie in der Desktop-App ein Passwort fest, um die Browser-Oberfläche zu nutzen.',
   },
   bulk_editing: {
     title: 'Massenbearbeitung',

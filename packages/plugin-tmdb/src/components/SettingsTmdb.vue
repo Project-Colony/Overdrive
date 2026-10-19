@@ -182,6 +182,8 @@ const arrayMetas = computed(() =>
 )
 
 function saveKey() {
+  // Blur alone must never rewrite the stored key (e.g. with a blank field).
+  if (apiKey.value === (settingsStore.tmdbApiKey || '')) return
   setOption(apiKey.value, 'tmdbApiKey')
   configured.value = apiKey.value.trim().length > 0
 }

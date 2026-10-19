@@ -343,6 +343,8 @@ const selectedPerformerGender = computed({
 })
 
 function saveTpdbApiKey() {
+  // Blur alone must never rewrite the stored key (e.g. with a blank field).
+  if (tpdbApiKey.value === (settingsStore.tpdbApiKey || '')) return
   setOption(tpdbApiKey.value, 'tpdbApiKey')
 }
 

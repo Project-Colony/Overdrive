@@ -1436,6 +1436,7 @@ const ja = {
     log_in: 'ログイン',
     password_required: 'パスワードを入力',
     wrong_password: 'パスワードが間違っています',
+    desktop_only: 'Overdrive はパスワードなしのデスクトップアプリとして実行されています。ブラウザ UI を使うには、デスクトップアプリでパスワードを設定してください。',
   },
   bulk_editing: {
     title: '一括編集',

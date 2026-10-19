@@ -5,6 +5,7 @@ import { createSettingsRepository } from '../../api/db/repositories/settings'
 import { saveConfigFile } from './configFile'
 import { pickPublicHost } from './publicHost'
 import { parseBooleanSetting } from '../../shared/parseBooleanSetting'
+import { getAuthService } from './authRegistry'
 
 const LAN_ENABLED_VALUES = ['1', 'true', 'yes', 'on']
 
@@ -39,6 +40,14 @@ function isLanAccessEnvLocked(): boolean {
   return envLocked
 }
 
+const LAN_PASSWORD_REQUIRED = 'Set a password before enabling LAN access'
+
+/** Same source as the login check: passwordProtection on and a non-empty phrase. */
+async function isPasswordSet(): Promise<boolean> {
+  const settings = await getAuthService().loadSecuritySettings()
+  return settings.passwordProtection && settings.phrase !== ''
+}
+
 function getBindHost(): string {
   return lanEnabled ? '0.0.0.0' : '127.0.0.1'
 }
@@ -68,13 +77,16 @@ async function initLanAccess(db: ApiDb, _helpers: NetworkHelpers, config?: Serve
 
   if (config && typeof config.allowLanAccess === 'string' && config.allowLanAccess !== '') {
     lanEnabled = parseBooleanSetting(config.allowLanAccess, false)
-    return lanEnabled
+  } else {
+    const settingsRepo = createSettingsRepository(db.drizzle)
+    const {row: setting} = settingsRepo.findOrCreateByOption('allowLanAccess', '0')
+    lanEnabled = parseBooleanSetting(setting.value, false)
   }
 
-  const settingsRepo = createSettingsRepository(db.drizzle)
-  const {row: setting} = settingsRepo.findOrCreateByOption('allowLanAccess', '0')
-
-  lanEnabled = parseBooleanSetting(setting.value, false)
+  if (lanEnabled && !await isPasswordSet()) {
+    console.warn(`LAN access disabled: ${LAN_PASSWORD_REQUIRED}`)
+    lanEnabled = false
+  }
 
   if (config) {
     config.allowLanAccess = lanEnabled ? '1' : '0'
@@ -90,6 +102,10 @@ function registerServerNetworkDeps(deps: ServerNetworkDeps) {
 async function applyLanAccessChange(enabled: boolean) {
   if (envLocked) {
     throw new Error('LAN access is controlled by MEDIA_CHIPS_ALLOW_LAN environment variable')
+  }
+
+  if (enabled && !await isPasswordSet()) {
+    throw new Error(LAN_PASSWORD_REQUIRED)
   }
 
   // Idempotent: zoom / transcode / other global saves must never rebind the HTTP
@@ -121,6 +137,7 @@ export {
   initLanAccess,
   isLanAccessEnabled,
   isLanAccessEnvLocked,
+  isPasswordSet,
   getBindHost,
   syncNetworkConfig,
   registerServerNetworkDeps,

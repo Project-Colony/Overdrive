@@ -44,6 +44,8 @@ const {db} = setupDatabase({databasesPath, dbConfig})
 const {app, router} = createExpressApp()
 const authService = initAuthService(db)
 app.use(createAuthMiddleware(authService))
+// Video streaming and transcode routes live on `router`: mount it behind auth.
+app.use(router)
 registerAuthRoutes(app, authService)
 
 // Answer Electron waitForBackend / SPA boot before loading Task/face/transcode graphs.
