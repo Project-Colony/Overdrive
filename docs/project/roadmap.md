@@ -51,8 +51,9 @@ On a detail, the upstream code wins; on scope, this roadmap wins.
 
 ## Constraints
 
-- **License:** GPL-3.0-only, because upstream is GPL-3.0 and we cannot add
-  "or later" without the copyright holders. Upstream declares `GPL-3.0`, the
+- **License:** GPL-3.0-only, decided: upstream is GPL-3.0, and adding
+  "or later" would need its copyright holders' permission, which Overdrive
+  does not seek. Upstream declares `GPL-3.0`, the
   deprecated SPDX alias of `GPL-3.0-only`. This is the one exception to the
   org's GPL-3.0-or-later rule: `[workspace.package]` says
   `license = "GPL-3.0-only"`, and the README badge and License section
@@ -658,6 +659,4 @@ Later:
   store build enables the adult scrapers (Phase 8).
 - First release: proposed once Phases 0 to 4 work (import, browse, filters,
   previews, external player).
-- Licence: ask the MediaChips copyright holders for permission to use
-  GPL-3.0-or-later; until then, GPL-3.0-only.
 - New features and improvements beyond parity: to be defined.
