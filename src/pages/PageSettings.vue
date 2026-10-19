@@ -304,10 +304,6 @@
 
           <div v-else-if="tab === 'about'">
             <SettingsList>
-              <SettingsSection id="settings-registration">
-                <SettingsRegistration/>
-              </SettingsSection>
-
               <SettingsSection id="settings-about">
                 <About/>
               </SettingsSection>
@@ -436,9 +432,6 @@ const SettingsGeneral = defineAsyncComponent(() =>
 )
 const SettingsLocale = defineAsyncComponent(() =>
   import("@/components/settings/general/SettingsLocale.vue")
-)
-const SettingsRegistration = defineAsyncComponent(() =>
-  import("@/components/settings/about/SettingsRegistration.vue")
 )
 const SettingsPlugins = defineAsyncComponent(() =>
   import("@/components/settings/plugins/SettingsPlugins.vue")

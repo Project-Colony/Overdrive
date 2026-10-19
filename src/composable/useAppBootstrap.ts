@@ -302,12 +302,6 @@ export function useAppBootstrap({isPlayerWindow, appZoom}: UseAppBootstrapOption
     }
   }
 
-  function runAutoRegistration(): void {
-    registrationStore.tryAutoRegisterOnStartup().catch((error) => {
-      console.error('Auto registration failed:', error)
-    })
-  }
-
   const saveWindowSize = debounce(() => {
     const app_window = isPlayerWindow.value ? 'player' : 'win'
     const data = {
@@ -567,7 +561,6 @@ export function useAppBootstrap({isPlayerWindow, appZoom}: UseAppBootstrapOption
     await nextTick()
     isAppReady.value = true
     store.is_app_ready = true
-    runAutoRegistration()
     void settleFreeLibraryCapOnStartup()
     if (!operationsStore.migrationLowDb.dialog) {
       openOnboardingIfNeeded(isPlayerWindow.value)

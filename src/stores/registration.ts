@@ -489,33 +489,9 @@ export const useRegistrationStore = defineStore('useRegistrationStore', {
       }
     },
 
-    reg(state): boolean {
-      try {
-        // Official Microsoft Store AppX only (`MEDIA_CHIPS_MSSTORE`).
-        if (isMsStoreBuild()) {
-          return true
-        }
-
-        const info = this.regInfo
-        if (!info || typeof info !== 'object' || Object.keys(info).length === 0) {
-          return false
-        }
-
-        const today = new Date().toISOString().substring(0, 10)
-        if (today > (info.license_expiry || '')) {
-          return false
-        }
-
-        if (!state.machineId) {
-          return false
-        }
-
-        const arr = [info.fingerprint_1, info.fingerprint_2, info.fingerprint_3]
-        return arr.includes(state.machineId)
-      } catch (error) {
-        console.error('reg getter error:', error)
-        return false
-      }
+    // Overdrive: every feature is available without an activation key.
+    reg(): boolean {
+      return true
     },
   },
 })
