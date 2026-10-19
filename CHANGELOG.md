@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.4] - 2026-10-19
+
+### Security
+
+- The app password is stored as a scrypt hash instead of plain text; existing
+  passwords are converted automatically. The password field in Settings no
+  longer shows it: type a new one to change it, or leave it empty.
+- Cross-origin requests are no longer allowed to send credentials.
+
+### Fixed
+
+- The Linux executable is named `overdrive`.
+
 ## [1.12.3] - 2026-10-19
 
 ### Security
