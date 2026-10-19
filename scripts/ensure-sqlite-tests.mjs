@@ -1,20 +1,17 @@
 import { spawnSync } from 'node:child_process'
-import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const require = createRequire(import.meta.url)
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+// Probe in a child process: loading the binding here, then loading it again
+// after `npm rebuild` replaced the file, crashes this process (SIGSEGV).
 function canOpenSqlite() {
-  try {
-    const Database = require('better-sqlite3')
-    const sqlite = new Database(':memory:')
-    sqlite.close()
-    return true
-  } catch {
-    return false
-  }
+  const result = spawnSync(process.execPath, [
+    '-e',
+    "new (require('better-sqlite3'))(':memory:').close()",
+  ], {cwd: root, stdio: 'ignore'})
+  return result.status === 0
 }
 
 if (!canOpenSqlite()) {
