@@ -3,6 +3,7 @@ import {
   normalizeMediaPath,
   pathsEquivalent,
 } from './normalizeUserPath'
+import {trimTrailingSeparators} from '../../shared/mediaPath'
 
 export function parseExcludedPathsJson(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -58,7 +59,7 @@ export function normalizeExcludedPaths(
     if (!normalized) continue
     // Drop trailing separators so `/tmp` and `/tmp/` collide.
     if (normalized.length > 1) {
-      normalized = normalized.replace(/[\\/]+$/, '')
+      normalized = trimTrailingSeparators(normalized)
     }
     if (!isPathInsideFolder(normalized, root)) continue
 

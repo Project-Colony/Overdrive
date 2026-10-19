@@ -312,7 +312,7 @@ function repairWatchRelatedFilters(
   filters: Array<Record<string, unknown>>,
   context: Record<string, unknown>,
 ): Array<Record<string, unknown>> {
-  const goal = String(context.goal || '').trim()
+  const goal = String(context.goal || '').trim().slice(0, 500)
   if (!goal || !isWatchRelatedGoal(goal)) return filters
 
   const availableFields = (Array.isArray(context.availableFields) ? context.availableFields : [])

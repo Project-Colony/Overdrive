@@ -40,3 +40,10 @@ export function mediaNameLooksLikePath(name: string | null | undefined): boolean
   const value = String(name ?? '')
   return value.includes('/') || value.includes('\\')
 }
+
+/** Strip trailing separators in linear time (a `/[\\/]+$/` regex is quadratic on long separator runs). */
+export function trimTrailingSeparators(value: string, separators = '/\\'): string {
+  let end = value.length
+  while (end > 0 && separators.includes(value[end - 1])) end--
+  return value.slice(0, end)
+}

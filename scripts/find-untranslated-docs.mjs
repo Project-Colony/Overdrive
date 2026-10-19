@@ -9,7 +9,7 @@ const locales = ['en', 'pt', 'de', 'fr', 'ru', 'es', 'cn', 'ja'];
 
 function parseEntries(block) {
   const entries = {};
-  const re = /'([^']+)':\s*\{\s*name:\s*'((?:\\'|[^'])*)',\s*content:\s*`((?:\\.|[^`])*)`/g;
+  const re = /'([^']+)':\s*\{\s*name:\s*'((?:\\.|[^'\\])*)',\s*content:\s*`((?:\\.|[^`\\])*)`/g;
   let m;
   while ((m = re.exec(block))) {
     entries[m[1]] = {
@@ -17,7 +17,7 @@ function parseEntries(block) {
       content: m[3],
     };
   }
-  const uiMatch = block.match(/\bui:\s*\{\s*name:\s*'((?:\\'|[^'])*)',\s*content:\s*`((?:\\.|[^`])*)`/);
+  const uiMatch = block.match(/\bui:\s*\{\s*name:\s*'((?:\\.|[^'\\])*)',\s*content:\s*`((?:\\.|[^`\\])*)`/);
   if (uiMatch) {
     entries.ui = {
       name: uiMatch[1].replace(/\\'/g, "'"),

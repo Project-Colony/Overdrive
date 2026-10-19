@@ -1,7 +1,8 @@
+import {trimTrailingSeparators} from '../../../../../shared/mediaPath'
 import type {JellyfinOldIdPrefix} from './types'
 
 export function normalizeJellyfinBaseUrl(baseUrl: string): string {
-  return String(baseUrl || '').trim().replace(/\/+$/, '')
+  return trimTrailingSeparators(String(baseUrl || '').trim(), '/')
 }
 
 export function jellyfinOldId(

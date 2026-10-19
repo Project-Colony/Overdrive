@@ -1,5 +1,6 @@
 import {getItemDiskRoot, getItemParentPath} from './itemsGroupBy'
 import {isVirtualZipPath} from './zipPath'
+import {trimTrailingSeparators} from './mediaPath'
 
 /** Normalize media/folder paths for library browse (forward slashes, no trailing slash). */
 export function normalizeLibraryFolderPath(value: string | null | undefined): string {
@@ -12,12 +13,12 @@ export function normalizeLibraryFolderPath(value: string | null | undefined): st
 
   // UNC `//server/share` — keep leading double slash.
   if (normalized.startsWith('//')) {
-    normalized = `//${normalized.slice(2).replace(/\/+$/, '')}`
+    normalized = `//${trimTrailingSeparators(normalized.slice(2), '/')}`
     return normalized || '//'
   }
 
   if (normalized !== '/') {
-    normalized = normalized.replace(/\/+$/, '')
+    normalized = trimTrailingSeparators(normalized, '/')
   }
   return normalized
 }

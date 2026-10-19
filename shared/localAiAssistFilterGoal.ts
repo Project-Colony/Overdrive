@@ -34,7 +34,7 @@ export function parseRelativeDays(text: string): number | null {
 
   // Prefer explicit calendar phrases elsewhere; still allow rolling windows here.
   const numbered = raw.match(
-    /(\d+)\s*(days?|day|дн\.?|дня|дней|день|weeks?|week|недел[яиь]?|months?|month|месяц(?:а|ев)?|years?|year|год(?:а|у)?|лет)/i,
+    /(?<!\d)(\d+)\s*(days?|day|дн\.?|дня|дней|день|weeks?|week|недел[яиь]?|months?|month|месяц(?:а|ев)?|years?|year|год(?:а|у)?|лет)/i,
   )
   if (numbered) {
     const amount = Number(numbered[1])
@@ -68,7 +68,7 @@ export function isWatchRelatedGoal(goal: string): boolean {
 }
 
 export function isNegatedWatchGoal(goal: string): boolean {
-  return /не\s*смотр|не\s*просмотр|unwatched|haven'?t\s+watched|not\s+watched|never\s+watched|without\s+watch|непросмотр|nicht\s+gesehen|seit\s+.*nicht\s+gesehen|pas\s+vu|no\s+visto|não\s+assist|見ていない|未观看/i.test(goal)
+  return /не\s*смотр|не\s*просмотр|unwatched|haven'?t\s+watched|not\s+watched|never\s+watched|without\s+watch|непросмотр|nicht\s+gesehen|pas\s+vu|no\s+visto|não\s+assist|見ていない|未观看/i.test(goal)
 }
 
 export function isNeverWatchedGoal(goal: string): boolean {
@@ -280,7 +280,7 @@ function durationToSeconds(amount: number, unit: string | undefined): number {
 export function synthesizeFiltersFromGoal(
   context: Record<string, unknown>,
 ): GoalFilterRow[] {
-  const goal = String(context.goal || '').trim()
+  const goal = String(context.goal || '').trim().slice(0, 500)
   if (!goal) return []
 
   const availableFields = (Array.isArray(context.availableFields) ? context.availableFields : [])
@@ -696,12 +696,12 @@ function synthesizeResolutionFilters(
     return
   }
 
-  const heightMatch = goal.match(/(?:высот\w*|height)\s*(>=|<=|>|<|=|≥|≤)?\s*(\d{3,4})/i)
+  const heightMatch = goal.match(/(?:высот\w*|height)\s*(?:(>=|<=|>|<|=|≥|≤)\s*)?(\d{3,4})/i)
   if (heightMatch) {
     const amount = parseNumberToken(heightMatch[2])
     if (amount != null) pushFilter(out, height, parseCompareOp(heightMatch[1]), amount)
   }
-  const widthMatch = goal.match(/(?:ширин\w*|width)\s*(>=|<=|>|<|=|≥|≤)?\s*(\d{3,4})/i)
+  const widthMatch = goal.match(/(?:ширин\w*|width)\s*(?:(>=|<=|>|<|=|≥|≤)\s*)?(\d{3,4})/i)
   if (widthMatch) {
     const amount = parseNumberToken(widthMatch[2])
     if (amount != null) pushFilter(out, width, parseCompareOp(widthMatch[1]), amount)
@@ -942,12 +942,12 @@ export function residualUnparsedFilterGoal(goal: string): string {
     /без\s+прогресс[а-яёa-z]*|no\s+progress|not\s+started|не\s+начат[а-яёa-z]*/gi,
     /(?:в\s+)?этом\s+(?:месяце|году)|этой\s+неделе|this\s+(?:month|week|year)/gi,
     /последн\w*\s+(?:месяц|недел\w*|год)|за\s+(?:месяц|недел\w*|год)|for\s+a\s+(?:month|week|year)|past\s+(?:month|week|year)/gi,
-    /без\s+[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё0-9 -]*/gi,
-    /(?:empty|no|missing)\s+[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё0-9 -]*/gi,
-    /[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё0-9 -]{1,40}\s*(?:пуст\w*|empty|is\s+null|заполнен\w*|not\s+null)/gi,
-    /[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё0-9 -]{1,40}\s*[:=]\s*["']?[^"'`\n;]+/gi,
+    /без\s+[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё -]*/gi,
+    /(?:empty|no|missing)\s+[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё -]*/gi,
+    /[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё -]{1,40}\s*(?:пуст\w*|empty|is\s+null|заполнен\w*|not\s+null)/gi,
+    /[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё -]{1,40}\s*[:=]\s*["']?[^"'`\n;]+/gi,
     /(?:тег(?:и)?|tags?)\s*[:=]?\s*["']?[^"'`\n,;]+/gi,
-    /(?:кроме|exclude|without|без\s+тег(?:а|ов)?|not)\s+[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё0-9 -]{1,40}\s*[:=]\s*["']?[^"'`\n;]+/gi,
+    /(?:кроме|exclude|without|без\s+тег(?:а|ов)?|not)\s+[A-Za-zА-Яа-яЁё0-9][\wА-Яа-яЁё -]{1,40}\s*[:=]\s*["']?[^"'`\n;]+/gi,
     /и\s+|and\s+|plus\s+/gi,
   ]
   for (const pattern of patterns) {
@@ -973,7 +973,7 @@ export function buildLocalFilterAssistSuggestion(
   context: Record<string, unknown>,
   options: {allowPartial?: boolean} = {},
 ): Record<string, unknown> | null {
-  const goal = String(context.goal || '').trim()
+  const goal = String(context.goal || '').trim().slice(0, 500)
   const filters = synthesizeFiltersFromGoal(context)
   if (!goal || !filters.length) return null
   const covered = isFilterGoalCoveredLocally(goal, filters)

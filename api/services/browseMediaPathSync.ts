@@ -1,4 +1,5 @@
 import {normalizeLibraryFolderPath} from '../../shared/libraryFolderBrowse'
+import {trimTrailingSeparators} from '../../shared/mediaPath'
 import {buildBulkPathUpdatePatch} from './mediaBulkPathUpdate'
 import {buildFolderPathLikePatterns} from '../utils/watcherFolderPaths'
 import {buildPathLookupVariants} from '../utils/normalizeUserPath'
@@ -36,12 +37,12 @@ export function remapMovedMediaPath(
       return toPath
     }
     for (const sep of ['/', '\\'] as const) {
-      const withSep = prefix.replace(/[/\\]+$/, '') + sep
+      const withSep = trimTrailingSeparators(prefix) + sep
       if (
         original.startsWith(withSep)
         || original.toLowerCase().startsWith(withSep.toLowerCase())
       ) {
-        const dest = String(toPath).replace(/[/\\]+$/, '')
+        const dest = trimTrailingSeparators(String(toPath))
         return `${dest}${sep}${original.slice(withSep.length)}`
       }
     }

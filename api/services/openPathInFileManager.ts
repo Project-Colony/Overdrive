@@ -1,6 +1,7 @@
 import {execFile} from 'child_process'
 import path from 'path'
 import {promisify} from 'util'
+import {trimTrailingSeparators} from '../../shared/mediaPath'
 
 const execFileAsync = promisify(execFile)
 
@@ -32,7 +33,7 @@ export function isBenignWindowsExplorerExit(error: unknown): boolean {
 function buildWindowsArgs(targetPath: string, revealInFolder: boolean): string[] {
   if (revealInFolder) {
     // No extra quotes — execFile passes argv directly. Trailing slash breaks /select.
-    const normalized = targetPath.replace(/[/\\]+$/, '')
+    const normalized = trimTrailingSeparators(targetPath)
     return [`/select,${normalized}`]
   }
   return [targetPath]

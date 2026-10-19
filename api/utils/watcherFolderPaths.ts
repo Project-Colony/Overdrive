@@ -1,8 +1,9 @@
 import path from 'path'
 import { normalizeMediaPath } from './normalizeUserPath'
+import { trimTrailingSeparators } from '../../shared/mediaPath'
 
 export function buildFolderPathLikePatterns(folderPath: string): string[] {
-  const normalized = normalizeMediaPath(folderPath).replace(/[\\/]+$/, '')
+  const normalized = trimTrailingSeparators(normalizeMediaPath(folderPath))
   if (!normalized) return []
 
   const patterns = new Set<string>()
@@ -10,7 +11,7 @@ export function buildFolderPathLikePatterns(folderPath: string): string[] {
     patterns.add(`${normalized}${sep}%`)
   }
 
-  const resolved = path.resolve(normalized).replace(/[\\/]+$/, '')
+  const resolved = trimTrailingSeparators(path.resolve(normalized))
   if (resolved !== normalized) {
     for (const sep of ['/', '\\']) {
       patterns.add(`${resolved}${sep}%`)

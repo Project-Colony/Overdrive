@@ -1,5 +1,6 @@
 import path from 'path'
 import {normalizeMediaPath} from '../utils/normalizeUserPath'
+import {trimTrailingSeparators} from '../../shared/mediaPath'
 
 /** Virtual media path: `/abs/archive.zip!/relative/entry.jpg` */
 export const ZIP_VIRTUAL_SEP = '!/'
@@ -83,10 +84,12 @@ export function isVirtualZipPath(filePath: string): boolean {
 
 /** Normalize zip entry to forward-slash relative form without leading slash. */
 export function normalizeZipEntryName(entryName: string): string {
-  return String(entryName || '')
-    .replace(/\\/g, '/')
-    .replace(/^\/+/, '')
-    .replace(/\/+$/, '')
+  return trimTrailingSeparators(
+    String(entryName || '')
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, ''),
+    '/',
+  )
 }
 
 export function isSafeZipEntryName(entryName: string): boolean {

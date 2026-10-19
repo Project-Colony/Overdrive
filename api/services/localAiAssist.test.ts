@@ -493,4 +493,24 @@ describe('localAiAssist', () => {
       availableFields,
     })?.local).toBe(true)
   })
+
+  it('stays linear on long digit and space runs in the goal', async () => {
+    const {synthesizeFiltersFromGoal, parseRelativeDays, isNegatedWatchGoal} = await import('../../shared/localAiAssistFilterGoal')
+    const availableFields = [
+      {param: 'width', type: 'number', name: 'Width'},
+      {param: 'views', type: 'number', name: 'Views'},
+    ]
+    const timed = (run: () => unknown) => {
+      const start = performance.now()
+      run()
+      return performance.now() - start
+    }
+    expect(timed(() => synthesizeFiltersFromGoal({goal: `width${' '.repeat(20000)}x`, availableFields}))).toBeLessThan(50)
+    expect(timed(() => synthesizeFiltersFromGoal({goal: `${'0'.repeat(40000)} views`, availableFields}))).toBeLessThan(50)
+    expect(timed(() => parseRelativeDays(`${'1'.repeat(40000)}x`))).toBeLessThan(50)
+    expect(timed(() => isNegatedWatchGoal(`seit ${' '.repeat(40000)}x`))).toBeLessThan(50)
+    expect(synthesizeFiltersFromGoal({goal: 'width >= 1920', availableFields})).toEqual([
+      {param: 'width', type: 'number', cond: '>=', val: 1920, active: true},
+    ])
+  })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mediaNameLooksLikePath, parseMediaFilePath } from './mediaPath'
+import { mediaNameLooksLikePath, parseMediaFilePath, trimTrailingSeparators } from './mediaPath'
 
 describe('parseMediaFilePath', () => {
   it('parses POSIX paths', () => {
@@ -63,5 +63,21 @@ describe('mediaNameLooksLikePath', () => {
     expect(mediaNameLooksLikePath('/Users/me/Videos/movie')).toBe(true)
     expect(mediaNameLooksLikePath('My Custom Title')).toBe(false)
     expect(mediaNameLooksLikePath('movie')).toBe(false)
+  })
+})
+
+describe('trimTrailingSeparators', () => {
+  it('strips trailing slashes and backslashes', () => {
+    expect(trimTrailingSeparators('/a//')).toBe('/a')
+    expect(trimTrailingSeparators('/')).toBe('')
+    expect(trimTrailingSeparators('a\\')).toBe('a')
+    expect(trimTrailingSeparators('a\\/', '/')).toBe('a\\')
+  })
+
+  it('stays linear on long separator runs', () => {
+    const input = `x${'/'.repeat(20000)}b`
+    const start = performance.now()
+    expect(trimTrailingSeparators(input)).toBe(input)
+    expect(performance.now() - start).toBeLessThan(50)
   })
 })

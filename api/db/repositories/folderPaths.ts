@@ -2,6 +2,7 @@ import { eq, inArray, or, sql } from 'drizzle-orm'
 import type { DrizzleClient } from '../client'
 import { folderPaths, tagsInFolders } from '../schema/folderPaths'
 import { normalizeMediaPath } from '../../utils/normalizeUserPath'
+import { trimTrailingSeparators } from '../../../shared/mediaPath'
 import { escapeLikePattern } from '../../services/globalSearchMerge'
 import { nowIso } from '../utils/timestamps'
 import { mapChunks } from '../utils/chunk'
@@ -9,7 +10,7 @@ import { mapChunks } from '../utils/chunk'
 export type FolderPathRow = typeof folderPaths.$inferSelect
 
 function canonicalizeFolderPath(folderPath: string): string {
-  return normalizeMediaPath(folderPath).replace(/[\\/]+$/, '')
+  return trimTrailingSeparators(normalizeMediaPath(folderPath))
 }
 
 export function createFolderPathsRepository(db: DrizzleClient) {

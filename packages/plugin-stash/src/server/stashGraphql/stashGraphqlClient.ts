@@ -1,3 +1,5 @@
+import { trimTrailingSeparators } from '../../../../../shared/mediaPath'
+
 export type StashSceneUpdateInput = {
   id: string
   rating100?: number | null
@@ -19,7 +21,7 @@ mutation SceneUpdate($input: SceneUpdateInput!) {
 `
 
 export function normalizeStashGraphqlUrl(url: string): string {
-  const trimmed = String(url || '').trim().replace(/\/+$/, '')
+  const trimmed = trimTrailingSeparators(String(url || '').trim(), '/')
   if (!trimmed) return ''
   if (trimmed.endsWith('/graphql')) return trimmed
   return `${trimmed}/graphql`

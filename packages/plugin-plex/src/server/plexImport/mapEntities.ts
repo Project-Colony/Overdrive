@@ -1,5 +1,7 @@
+import {trimTrailingSeparators} from '../../../../../shared/mediaPath'
+
 export function normalizePlexBaseUrl(baseUrl: string): string {
-  return String(baseUrl || '').trim().replace(/\/+$/, '')
+  return trimTrailingSeparators(String(baseUrl || '').trim(), '/')
 }
 
 export function plexOldId(kind: string, id: string | number): string {
