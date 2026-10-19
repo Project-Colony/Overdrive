@@ -10,8 +10,7 @@ and no license server. It is part of Project-Colony.
 
 > **Status:** 1.12.1 is the first release: MediaChips 1.12.0 renamed, unlocked
 > and with safer defaults (see [CHANGELOG.md](CHANGELOG.md)). Builds are not
-> code-signed. A native Rust rewrite is planned in
-> [docs/project/roadmap.md](docs/project/roadmap.md).
+> code-signed. A native Rust rewrite is planned.
 
 ## What it does
 
