@@ -9,7 +9,7 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const DEFAULT_DB = '/Users/vit/Library/Application Support/MediaChips/app_storage/19f42ca631d/db.sqlite'
 const SAMPLE_SIZE = Number(process.argv[2] || 100)
 
-dotenv.config({path: path.join(ROOT, '.env')})
+dotenv.config({path: path.join(ROOT, '.env'), quiet: true})
 
 const TPDB_GRAPHQL_URL = 'https://theporndb.net/graphql'
 const apiKey = String(process.env.TPDB_API_KEY || '').trim()

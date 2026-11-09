@@ -605,7 +605,8 @@ const statusChipLabel = computed(() => {
   return undefined
 })
 
-const selectedPerformerMeta = ref<Meta | null>(null)
+type CategoryOption = ReturnType<typeof leafCategoryOptions>[number]
+const selectedPerformerMeta = ref<CategoryOption | null>(null)
 const minConfidence = ref(clampFaceMatchConfidenceForm(settingsStore['faceMatch.minConfidence']))
 const candidateLimit = ref(clampFaceMatchCandidateLimitForm(settingsStore['faceMatch.candidateLimit']))
 const detectMinScore = ref(clampFaceDetectMinScoreForm(settingsStore['faceDetect.minScore']))
@@ -810,7 +811,7 @@ const syncSelectedMetaFromSettings = () => {
   selectedPerformerMeta.value = arrayMetas.value.find((meta) => Boolean((meta as Meta & {scraper?: unknown}).scraper)) || null
 }
 
-const onPerformerMetaChange = (meta: Meta | null) => {
+const onPerformerMetaChange = (meta: CategoryOption | null) => {
   selectedPerformerMeta.value = meta
   void setOption(meta?.id ? String(meta.id) : '', 'faceMatch.performerMetaId')
   void refreshMatchStatus()
