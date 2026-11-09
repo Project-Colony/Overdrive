@@ -22,6 +22,8 @@ import {
 
 dotenv.config({
   path: projectPath('.env'),
+  // dotenv 17+ logs every load unless told to stay quiet; keep the old silent startup.
+  quiet: true,
 })
 
 const startupStartedAt = Date.now()

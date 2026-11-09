@@ -47,13 +47,14 @@ import {useSettingsStore} from '@/stores/settings'
 import {setOption} from '@/services/settingsService'
 import {getDefaultTagCategoryId} from '@/services/ensureStarterMeta'
 import {leafCategoryOptions} from '@/utils/tagCategoryTree'
-import type {Meta} from '@/types/stores'
 
 const {t} = useI18n()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
 
-const selectedMeta = ref<Meta | null>(null)
+type CategoryOption = ReturnType<typeof leafCategoryOptions>[number]
+
+const selectedMeta = ref<CategoryOption | null>(null)
 
 const arrayMetas = computed(() =>
   leafCategoryOptions(appStore.meta || []),
@@ -67,7 +68,7 @@ function syncFromSettings() {
   selectedMeta.value = arrayMetas.value.find((meta) => Number(meta.id) === resolvedId) || null
 }
 
-function onMetaChange(meta: Meta | null) {
+function onMetaChange(meta: CategoryOption | null) {
   if (!meta?.id) {
     syncFromSettings()
     return
