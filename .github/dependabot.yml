@@ -1,0 +1,41 @@
+# Keep the supply chain current: GitHub Actions and npm dependencies.
+#
+# Copied from templates/dependabot.yml in Project-Colony-Resources, with its
+# cargo entry turned into npm: this repository builds from the root
+# package.json and package-lock.json.
+#
+# Dependabot opening a PR is not the rule being followed; merging it is. See
+# design/dependencies.md: everything is on its latest release, always.
+version: 2
+updates:
+  # A stale action is the same problem as a stale crate, with more privileges.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # The shared signing workflow stays at the organisation pin, which moves
+    # for every program at once: design/releases.md in
+    # Project-Colony-Resources, "The pin". A Dependabot PR would move one
+    # repository alone. Dependabot names that dependency after the workflow
+    # path (Project-Colony/Project-Colony-Resources/.github/workflows/...), so
+    # the rule needs the trailing wildcard to match it.
+    ignore:
+      - dependency-name: "Project-Colony/Project-Colony-Resources*"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Transitive packages too, so the lockfile stays current without a manual
+    # `npm update`.
+    allow:
+      - dependency-type: all
+    groups:
+      # Minor and patch bumps arrive as one PR, so a routine week is one review
+      # rather than fifteen. Majors stay separate: they deserve their own read.
+      npm-minor:
+        update-types: ["minor", "patch"]
